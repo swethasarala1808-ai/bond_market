@@ -1,0 +1,114 @@
+{
+ "name": "Bond Coupon Receipt",
+ "creation": "2024-01-01 00:00:00",
+ "modified": "2024-01-01 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "doctype": "DocType",
+ "module": "Bond",
+ "label": "Bond Coupon Receipt",
+ "naming_rule": "Expression",
+ "autoname": "BCRC-.YYYY.-.#####",
+ "fields": [
+  {
+   "fieldname": "client_name",
+   "fieldtype": "Data",
+   "label": "Client Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "client_phone",
+   "fieldtype": "Data",
+   "label": "Client Phone"
+  },
+  {
+   "fieldname": "isin",
+   "fieldtype": "Data",
+   "label": "ISIN"
+  },
+  {
+   "fieldname": "bond_name",
+   "fieldtype": "Data",
+   "label": "Bond Name"
+  },
+  {
+   "fieldname": "_col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "coupon_date",
+   "fieldtype": "Date",
+   "label": "Coupon Date"
+  },
+  {
+   "fieldname": "quantity_held",
+   "fieldtype": "Float",
+   "label": "Quantity Held"
+  },
+  {
+   "fieldname": "coupon_per_unit",
+   "fieldtype": "Currency",
+   "label": "Coupon Per Unit"
+  },
+  {
+   "fieldname": "gross_amount",
+   "fieldtype": "Currency",
+   "label": "Gross Amount"
+  },
+  {
+   "fieldname": "_col_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tds_deducted",
+   "fieldtype": "Currency",
+   "label": "TDS Deducted"
+  },
+  {
+   "fieldname": "tds_rate",
+   "fieldtype": "Float",
+   "label": "TDS Rate (%)"
+  },
+  {
+   "fieldname": "net_amount",
+   "fieldtype": "Currency",
+   "label": "Net Amount"
+  },
+  {
+   "fieldname": "credit_date",
+   "fieldtype": "Date",
+   "label": "Credit Date"
+  },
+  {
+   "fieldname": "bank_reference",
+   "fieldtype": "Data",
+   "label": "Bank Reference"
+  },
+  {
+   "fieldname": "whatsapp_sent",
+   "fieldtype": "Check",
+   "label": "WhatsApp Sent"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Credited\nPending\nFailed"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "All",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  }
+ ],
+ "is_submittable": 0,
+ "issingle": 0,
+ "track_changes": 1
+}

@@ -1,0 +1,136 @@
+{
+ "name": "Bond Document",
+ "creation": "2024-01-01 00:00:00",
+ "modified": "2024-01-01 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "doctype": "DocType",
+ "module": "Bond",
+ "label": "Bond Document",
+ "naming_rule": "Expression",
+ "autoname": "BDOC-.YYYY.-.#####",
+ "fields": [
+  {
+   "fieldname": "bond_name",
+   "fieldtype": "Data",
+   "label": "Bond Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "isin",
+   "fieldtype": "Data",
+   "label": "ISIN"
+  },
+  {
+   "fieldname": "document_name",
+   "fieldtype": "Data",
+   "label": "Document Name"
+  },
+  {
+   "fieldname": "document_type",
+   "fieldtype": "Select",
+   "label": "Document Type",
+   "options": "Prospectus\nInformation Memorandum\nTerm Sheet\nOffer Document\nESG Report\nCredit Rating Report\nAnnual Report\nAmendment\nOther"
+  },
+  {
+   "fieldname": "_col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "document_date",
+   "fieldtype": "Date",
+   "label": "Document Date"
+  },
+  {
+   "fieldname": "document_url",
+   "fieldtype": "Data",
+   "label": "Document URL"
+  },
+  {
+   "fieldname": "file_attachment",
+   "fieldtype": "Attach",
+   "label": "File Attachment"
+  },
+  {
+   "fieldname": "total_pages",
+   "fieldtype": "Int",
+   "label": "Total Pages"
+  },
+  {
+   "fieldname": "processing_status",
+   "fieldtype": "Select",
+   "label": "Processing Status",
+   "options": "Uploaded\nProcessing\nReady\nFailed"
+  },
+  {
+   "fieldname": "processed_on",
+   "fieldtype": "Datetime",
+   "label": "Processed On"
+  },
+  {
+   "fieldname": "extracted_content_section",
+   "fieldtype": "Section Break",
+   "label": "Extracted Content"
+  },
+  {
+   "fieldname": "extracted_text",
+   "fieldtype": "Long Text",
+   "label": "Extracted Text"
+  },
+  {
+   "fieldname": "document_summary",
+   "fieldtype": "Long Text",
+   "label": "Document Summary"
+  },
+  {
+   "fieldname": "key_terms_json",
+   "fieldtype": "Long Text",
+   "label": "Key Terms JSON"
+  },
+  {
+   "fieldname": "flags_section",
+   "fieldtype": "Section Break",
+   "label": "Flags"
+  },
+  {
+   "fieldname": "coupon_details_extracted",
+   "fieldtype": "Check",
+   "label": "Coupon Details Extracted"
+  },
+  {
+   "fieldname": "risk_factors_extracted",
+   "fieldtype": "Check",
+   "label": "Risk Factors Extracted"
+  },
+  {
+   "fieldname": "covenants_extracted",
+   "fieldtype": "Check",
+   "label": "Covenants Extracted"
+  },
+  {
+   "fieldname": "esg_details_extracted",
+   "fieldtype": "Check",
+   "label": "ESG Details Extracted"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "All",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  }
+ ],
+ "is_submittable": 0,
+ "issingle": 0,
+ "track_changes": 1
+}

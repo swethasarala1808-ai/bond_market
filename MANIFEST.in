@@ -1,0 +1,4 @@
+include MANIFEST.in
+recursive-include bond_app *.json *.js *.css *.html *.py *.txt *.md
+global-exclude *.pyc
+global-exclude __pycache__

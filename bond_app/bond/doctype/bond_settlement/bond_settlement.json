@@ -1,0 +1,140 @@
+{
+ "name": "Bond Settlement",
+ "creation": "2024-01-01 00:00:00",
+ "modified": "2024-01-01 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "doctype": "DocType",
+ "module": "Bond",
+ "label": "Bond Settlement",
+ "naming_rule": "Expression",
+ "autoname": "BSTL-.YYYY.-.#####",
+ "fields": [
+  {
+   "fieldname": "settlement_date",
+   "fieldtype": "Date",
+   "label": "Settlement Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "settlement_type",
+   "fieldtype": "Select",
+   "label": "Settlement Type",
+   "options": "T+0\nT+1\nT+2"
+  },
+  {
+   "fieldname": "isin",
+   "fieldtype": "Data",
+   "label": "ISIN"
+  },
+  {
+   "fieldname": "bond_name",
+   "fieldtype": "Data",
+   "label": "Bond Name"
+  },
+  {
+   "fieldname": "_col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "buyer_name",
+   "fieldtype": "Data",
+   "label": "Buyer Name"
+  },
+  {
+   "fieldname": "seller_name",
+   "fieldtype": "Data",
+   "label": "Seller Name"
+  },
+  {
+   "fieldname": "quantity",
+   "fieldtype": "Float",
+   "label": "Quantity"
+  },
+  {
+   "fieldname": "pricing_section",
+   "fieldtype": "Section Break",
+   "label": "Pricing"
+  },
+  {
+   "fieldname": "clean_price",
+   "fieldtype": "Float",
+   "label": "Clean Price"
+  },
+  {
+   "fieldname": "accrued_interest",
+   "fieldtype": "Currency",
+   "label": "Accrued Interest"
+  },
+  {
+   "fieldname": "dirty_price",
+   "fieldtype": "Float",
+   "label": "Dirty Price"
+  },
+  {
+   "fieldname": "settlement_amount",
+   "fieldtype": "Currency",
+   "label": "Settlement Amount"
+  },
+  {
+   "fieldname": "_col_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "stamp_duty",
+   "fieldtype": "Currency",
+   "label": "Stamp Duty"
+  },
+  {
+   "fieldname": "clearing_charges",
+   "fieldtype": "Currency",
+   "label": "Clearing Charges"
+  },
+  {
+   "fieldname": "net_payable",
+   "fieldtype": "Currency",
+   "label": "Net Payable"
+  },
+  {
+   "fieldname": "status_section",
+   "fieldtype": "Section Break",
+   "label": "Status"
+  },
+  {
+   "fieldname": "settlement_status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Pending\nSettled\nFailed\nPartially Settled"
+  },
+  {
+   "fieldname": "settlement_number",
+   "fieldtype": "Data",
+   "label": "Settlement Number"
+  },
+  {
+   "fieldname": "clearing_reference",
+   "fieldtype": "Data",
+   "label": "Clearing Reference"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "All",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  }
+ ],
+ "is_submittable": 0,
+ "issingle": 0,
+ "track_changes": 1
+}

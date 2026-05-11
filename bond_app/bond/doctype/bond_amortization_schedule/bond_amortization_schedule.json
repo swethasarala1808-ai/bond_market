@@ -1,0 +1,84 @@
+{
+ "name": "Bond Amortization Schedule",
+ "creation": "2024-01-01 00:00:00",
+ "modified": "2024-01-01 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "doctype": "DocType",
+ "module": "Bond",
+ "label": "Bond Amortization Schedule",
+ "naming_rule": "Expression",
+ "autoname": "BAMS-.YYYY.-.#####",
+ "fields": [
+  {
+   "fieldname": "bond_name",
+   "fieldtype": "Data",
+   "label": "Bond Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "isin",
+   "fieldtype": "Data",
+   "label": "ISIN"
+  },
+  {
+   "fieldname": "payment_number",
+   "fieldtype": "Int",
+   "label": "Payment Number"
+  },
+  {
+   "fieldname": "payment_date",
+   "fieldtype": "Date",
+   "label": "Payment Date"
+  },
+  {
+   "fieldname": "_col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "opening_principal",
+   "fieldtype": "Currency",
+   "label": "Opening Principal"
+  },
+  {
+   "fieldname": "coupon_payment",
+   "fieldtype": "Currency",
+   "label": "Coupon Payment"
+  },
+  {
+   "fieldname": "principal_payment",
+   "fieldtype": "Currency",
+   "label": "Principal Payment"
+  },
+  {
+   "fieldname": "total_payment",
+   "fieldtype": "Currency",
+   "label": "Total Payment"
+  },
+  {
+   "fieldname": "closing_principal",
+   "fieldtype": "Currency",
+   "label": "Closing Principal"
+  },
+  {
+   "fieldname": "outstanding_percent",
+   "fieldtype": "Float",
+   "label": "Outstanding (%)"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "All",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  }
+ ],
+ "is_submittable": 0,
+ "issingle": 0,
+ "track_changes": 1
+}

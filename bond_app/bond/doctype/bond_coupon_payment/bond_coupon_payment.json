@@ -1,0 +1,144 @@
+{
+ "name": "Bond Coupon Payment",
+ "creation": "2024-01-01 00:00:00",
+ "modified": "2024-01-01 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "doctype": "DocType",
+ "module": "Bond",
+ "label": "Bond Coupon Payment",
+ "naming_rule": "Expression",
+ "autoname": "BCPM-.YYYY.-.#####",
+ "fields": [
+  {
+   "fieldname": "isin",
+   "fieldtype": "Data",
+   "label": "ISIN",
+   "reqd": 1
+  },
+  {
+   "fieldname": "bond_name",
+   "fieldtype": "Data",
+   "label": "Bond Name"
+  },
+  {
+   "fieldname": "issuer_name",
+   "fieldtype": "Data",
+   "label": "Issuer Name"
+  },
+  {
+   "fieldname": "_col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "coupon_date",
+   "fieldtype": "Date",
+   "label": "Coupon Date"
+  },
+  {
+   "fieldname": "record_date",
+   "fieldtype": "Date",
+   "label": "Record Date"
+  },
+  {
+   "fieldname": "payment_date",
+   "fieldtype": "Date",
+   "label": "Payment Date"
+  },
+  {
+   "fieldname": "amounts_section",
+   "fieldtype": "Section Break",
+   "label": "Amounts"
+  },
+  {
+   "fieldname": "coupon_rate",
+   "fieldtype": "Float",
+   "label": "Coupon Rate (%)"
+  },
+  {
+   "fieldname": "coupon_amount_per_unit",
+   "fieldtype": "Currency",
+   "label": "Amount Per Unit"
+  },
+  {
+   "fieldname": "total_holders",
+   "fieldtype": "Int",
+   "label": "Total Holders"
+  },
+  {
+   "fieldname": "total_units",
+   "fieldtype": "Float",
+   "label": "Total Units"
+  },
+  {
+   "fieldname": "_col_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_coupon_payable",
+   "fieldtype": "Currency",
+   "label": "Total Coupon Payable"
+  },
+  {
+   "fieldname": "total_paid",
+   "fieldtype": "Currency",
+   "label": "Total Paid"
+  },
+  {
+   "fieldname": "total_pending",
+   "fieldtype": "Currency",
+   "label": "Total Pending"
+  },
+  {
+   "fieldname": "payment_section",
+   "fieldtype": "Section Break",
+   "label": "Payment"
+  },
+  {
+   "fieldname": "payment_status",
+   "fieldtype": "Select",
+   "label": "Payment Status",
+   "options": "Scheduled\nProcessing\nPaid\nPartially Paid\nDefaulted\nWaived"
+  },
+  {
+   "fieldname": "payment_mode",
+   "fieldtype": "Select",
+   "label": "Payment Mode",
+   "options": "NEFT\nRTGS\nECS\nManual"
+  },
+  {
+   "fieldname": "_col_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "utr_reference",
+   "fieldtype": "Data",
+   "label": "UTR Reference"
+  },
+  {
+   "fieldname": "actual_payment_date",
+   "fieldtype": "Date",
+   "label": "Actual Payment Date"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "All",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  }
+ ],
+ "is_submittable": 0,
+ "issingle": 0,
+ "track_changes": 1
+}

@@ -1,0 +1,195 @@
+{
+ "name": "Bond Contract Note",
+ "creation": "2024-01-01 00:00:00",
+ "modified": "2024-01-01 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "doctype": "DocType",
+ "module": "Bond",
+ "label": "Bond Contract Note",
+ "naming_rule": "Expression",
+ "autoname": "BCNT-.YYYY.-.#####",
+ "fields": [
+  {
+   "fieldname": "client_name",
+   "fieldtype": "Data",
+   "label": "Client Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "client_pan",
+   "fieldtype": "Data",
+   "label": "Client PAN"
+  },
+  {
+   "fieldname": "contract_date",
+   "fieldtype": "Date",
+   "label": "Contract Date"
+  },
+  {
+   "fieldname": "settlement_number",
+   "fieldtype": "Data",
+   "label": "Settlement Number"
+  },
+  {
+   "fieldname": "_col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "isin",
+   "fieldtype": "Data",
+   "label": "ISIN"
+  },
+  {
+   "fieldname": "bond_name",
+   "fieldtype": "Data",
+   "label": "Bond Name"
+  },
+  {
+   "fieldname": "transaction_type",
+   "fieldtype": "Select",
+   "label": "Transaction Type",
+   "options": "Buy\nSell"
+  },
+  {
+   "fieldname": "quantity",
+   "fieldtype": "Float",
+   "label": "Quantity"
+  },
+  {
+   "fieldname": "pricing_section",
+   "fieldtype": "Section Break",
+   "label": "Pricing"
+  },
+  {
+   "fieldname": "clean_price",
+   "fieldtype": "Float",
+   "label": "Clean Price"
+  },
+  {
+   "fieldname": "accrued_interest",
+   "fieldtype": "Currency",
+   "label": "Accrued Interest"
+  },
+  {
+   "fieldname": "dirty_price",
+   "fieldtype": "Float",
+   "label": "Dirty Price"
+  },
+  {
+   "fieldname": "consideration",
+   "fieldtype": "Currency",
+   "label": "Consideration"
+  },
+  {
+   "fieldname": "charges_section",
+   "fieldtype": "Section Break",
+   "label": "Charges"
+  },
+  {
+   "fieldname": "brokerage_amount",
+   "fieldtype": "Currency",
+   "label": "Brokerage Amount"
+  },
+  {
+   "fieldname": "stamp_duty",
+   "fieldtype": "Currency",
+   "label": "Stamp Duty"
+  },
+  {
+   "fieldname": "stt",
+   "fieldtype": "Currency",
+   "label": "STT"
+  },
+  {
+   "fieldname": "_col_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sebi_charges",
+   "fieldtype": "Currency",
+   "label": "SEBI Charges"
+  },
+  {
+   "fieldname": "other_charges",
+   "fieldtype": "Currency",
+   "label": "Other Charges"
+  },
+  {
+   "fieldname": "gst_on_brokerage",
+   "fieldtype": "Currency",
+   "label": "GST on Brokerage"
+  },
+  {
+   "fieldname": "gst_on_charges",
+   "fieldtype": "Currency",
+   "label": "GST on Charges"
+  },
+  {
+   "fieldname": "total_charges",
+   "fieldtype": "Currency",
+   "label": "Total Charges"
+  },
+  {
+   "fieldname": "net_section",
+   "fieldtype": "Section Break",
+   "label": "Net"
+  },
+  {
+   "fieldname": "net_obligation",
+   "fieldtype": "Currency",
+   "label": "Net Obligation"
+  },
+  {
+   "fieldname": "net_obligation_type",
+   "fieldtype": "Select",
+   "label": "Net Obligation Type",
+   "options": "Payable\nReceivable"
+  },
+  {
+   "fieldname": "_col_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "label": "Due Date"
+  },
+  {
+   "fieldname": "payment_status",
+   "fieldtype": "Select",
+   "label": "Payment Status",
+   "options": "Pending\nPaid\nOverdue"
+  },
+  {
+   "fieldname": "sent_to_client",
+   "fieldtype": "Check",
+   "label": "Sent to Client"
+  },
+  {
+   "fieldname": "pdf_generated",
+   "fieldtype": "Check",
+   "label": "PDF Generated"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "All",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  }
+ ],
+ "is_submittable": 0,
+ "issingle": 0,
+ "track_changes": 1
+}

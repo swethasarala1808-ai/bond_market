@@ -1,0 +1,154 @@
+{
+ "name": "Bond ESG Report",
+ "creation": "2024-01-01 00:00:00",
+ "modified": "2024-01-01 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "doctype": "DocType",
+ "module": "Bond",
+ "label": "Bond ESG Report",
+ "naming_rule": "Expression",
+ "autoname": "BESG-.YYYY.-.#####",
+ "fields": [
+  {
+   "fieldname": "bond_name",
+   "fieldtype": "Data",
+   "label": "Bond Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "isin",
+   "fieldtype": "Data",
+   "label": "ISIN"
+  },
+  {
+   "fieldname": "esg_type",
+   "fieldtype": "Select",
+   "label": "ESG Type",
+   "options": "Green\nBlue\nSocial\nSustainability\nClimate\nTransition\nGender Equality\nPandemic"
+  },
+  {
+   "fieldname": "_col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "report_date",
+   "fieldtype": "Date",
+   "label": "Report Date"
+  },
+  {
+   "fieldname": "report_period_from",
+   "fieldtype": "Date",
+   "label": "Period From"
+  },
+  {
+   "fieldname": "report_period_to",
+   "fieldtype": "Date",
+   "label": "Period To"
+  },
+  {
+   "fieldname": "proceeds_section",
+   "fieldtype": "Section Break",
+   "label": "Proceeds"
+  },
+  {
+   "fieldname": "proceeds_allocated",
+   "fieldtype": "Currency",
+   "label": "Proceeds Allocated"
+  },
+  {
+   "fieldname": "proceeds_unallocated",
+   "fieldtype": "Currency",
+   "label": "Proceeds Unallocated"
+  },
+  {
+   "fieldname": "projects_financed",
+   "fieldtype": "Long Text",
+   "label": "Projects Financed"
+  },
+  {
+   "fieldname": "impact_metrics_section",
+   "fieldtype": "Section Break",
+   "label": "Impact Metrics"
+  },
+  {
+   "fieldname": "co2_reduction_tonnes",
+   "fieldtype": "Float",
+   "label": "CO2 Reduction (Tonnes)"
+  },
+  {
+   "fieldname": "renewable_energy_mw",
+   "fieldtype": "Float",
+   "label": "Renewable Energy (MW)"
+  },
+  {
+   "fieldname": "_col_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "water_saved_litres",
+   "fieldtype": "Float",
+   "label": "Water Saved (Litres)"
+  },
+  {
+   "fieldname": "beneficiaries_count",
+   "fieldtype": "Int",
+   "label": "Beneficiaries Count"
+  },
+  {
+   "fieldname": "sdg_goals",
+   "fieldtype": "Data",
+   "label": "SDG Goals"
+  },
+  {
+   "fieldname": "verification_section",
+   "fieldtype": "Section Break",
+   "label": "Verification"
+  },
+  {
+   "fieldname": "third_party_verifier",
+   "fieldtype": "Data",
+   "label": "Third Party Verifier"
+  },
+  {
+   "fieldname": "verification_date",
+   "fieldtype": "Date",
+   "label": "Verification Date"
+  },
+  {
+   "fieldname": "verification_report_url",
+   "fieldtype": "Data",
+   "label": "Verification Report URL"
+  },
+  {
+   "fieldname": "_col_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "compliance_status",
+   "fieldtype": "Select",
+   "label": "Compliance Status",
+   "options": "Compliant\nNon-Compliant\nPending Review"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "All",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  }
+ ],
+ "is_submittable": 0,
+ "issingle": 0,
+ "track_changes": 1
+}

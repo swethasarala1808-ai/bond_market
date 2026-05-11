@@ -1,0 +1,173 @@
+{
+ "name": "Bond Holding",
+ "creation": "2024-01-01 00:00:00",
+ "modified": "2024-01-01 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "doctype": "DocType",
+ "module": "Bond",
+ "label": "Bond Holding",
+ "naming_rule": "Expression",
+ "autoname": "BHLD-.YYYY.-.#####",
+ "fields": [
+  {
+   "fieldname": "client_name",
+   "fieldtype": "Data",
+   "label": "Client Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "isin",
+   "fieldtype": "Data",
+   "label": "ISIN"
+  },
+  {
+   "fieldname": "bond_name",
+   "fieldtype": "Data",
+   "label": "Bond Name"
+  },
+  {
+   "fieldname": "issuer_name",
+   "fieldtype": "Data",
+   "label": "Issuer Name"
+  },
+  {
+   "fieldname": "_col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "purchase_date",
+   "fieldtype": "Date",
+   "label": "Purchase Date"
+  },
+  {
+   "fieldname": "settlement_date",
+   "fieldtype": "Date",
+   "label": "Settlement Date"
+  },
+  {
+   "fieldname": "face_value",
+   "fieldtype": "Currency",
+   "label": "Face Value"
+  },
+  {
+   "fieldname": "quantity",
+   "fieldtype": "Float",
+   "label": "Quantity"
+  },
+  {
+   "fieldname": "purchase_section",
+   "fieldtype": "Section Break",
+   "label": "Purchase"
+  },
+  {
+   "fieldname": "purchase_price",
+   "fieldtype": "Float",
+   "label": "Purchase Price"
+  },
+  {
+   "fieldname": "purchase_yield",
+   "fieldtype": "Float",
+   "label": "Purchase Yield (%)"
+  },
+  {
+   "fieldname": "purchase_amount",
+   "fieldtype": "Currency",
+   "label": "Purchase Amount"
+  },
+  {
+   "fieldname": "_col_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "current_price",
+   "fieldtype": "Float",
+   "label": "Current Price"
+  },
+  {
+   "fieldname": "current_value",
+   "fieldtype": "Currency",
+   "label": "Current Value"
+  },
+  {
+   "fieldname": "accrued_interest",
+   "fieldtype": "Currency",
+   "label": "Accrued Interest"
+  },
+  {
+   "fieldname": "total_value_with_interest",
+   "fieldtype": "Currency",
+   "label": "Total Value With Interest"
+  },
+  {
+   "fieldname": "p&l_section",
+   "fieldtype": "Section Break",
+   "label": "P&L"
+  },
+  {
+   "fieldname": "unrealized_pnl",
+   "fieldtype": "Currency",
+   "label": "Unrealized P&L"
+  },
+  {
+   "fieldname": "unrealized_pnl_percent",
+   "fieldtype": "Float",
+   "label": "Unrealized P&L (%)"
+  },
+  {
+   "fieldname": "interest_earned_to_date",
+   "fieldtype": "Currency",
+   "label": "Interest Earned To Date"
+  },
+  {
+   "fieldname": "_col_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "maturity_date",
+   "fieldtype": "Date",
+   "label": "Maturity Date"
+  },
+  {
+   "fieldname": "next_coupon_date",
+   "fieldtype": "Date",
+   "label": "Next Coupon Date"
+  },
+  {
+   "fieldname": "next_coupon_amount",
+   "fieldtype": "Currency",
+   "label": "Next Coupon Amount"
+  },
+  {
+   "fieldname": "holding_status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Active\nMatured\nSold\nDefaulted"
+  },
+  {
+   "fieldname": "demat_account",
+   "fieldtype": "Data",
+   "label": "Demat Account"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "All",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  }
+ ],
+ "is_submittable": 0,
+ "issingle": 0,
+ "track_changes": 1
+}

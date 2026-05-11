@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bond Dashboard — Bizaxl</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy-dark:#05133C;--navy-base:#091526;--mint:#14F1B1;--blue:#114EFF;
+  --bg:#030e1f;--card:#060f1e;--side:#060f1e;--border:#0d2040;
+  --text:#e2e8f0;--muted:#64748b;
+  --success:#00C950;--red:#ef4444;--amber:#f59e0b;
+  --grad:linear-gradient(135deg,#14F1B1,#114EFF);
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden}
+
+/* SIDEBAR */
+#sidebar{width:220px;background:var(--side);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.sidebar-logo{padding:1.5rem 1.25rem;border-bottom:1px solid var(--border)}
+.sidebar-logo-text{font-size:1.15rem;font-weight:700}
+.sidebar-logo-text span{background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sidebar-logo-sub{font-size:0.7rem;color:var(--muted);margin-top:2px}
+.sidebar-nav{flex:1;padding:1rem 0}
+.nav-item{display:flex;align-items:center;gap:10px;padding:11px 1.25rem;cursor:pointer;color:var(--muted);font-size:0.875rem;font-weight:500;border-left:3px solid transparent;transition:all 0.15s;user-select:none}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,0.03)}
+.nav-item.active{border-left-color:var(--mint);color:var(--mint);background:rgba(20,241,177,0.06)}
+.nav-icon{width:18px;text-align:center;font-size:1rem;flex-shrink:0}
+.sidebar-bottom{padding:1rem 1.25rem;border-top:1px solid var(--border)}
+.sidebar-user{font-size:0.8rem;color:var(--muted)}
+
+/* MAIN */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#topbar{height:56px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.5rem;gap:1rem;flex-shrink:0}
+#topbar h2{font-size:1.05rem;font-weight:600;flex:1}
+.topbar-actions{display:flex;gap:0.75rem;align-items:center}
+.btn{padding:8px 16px;border-radius:8px;border:none;font-size:0.8rem;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s}
+.btn-grad{background:var(--grad);color:#fff}
+.btn-grad:hover{opacity:0.9}
+.btn-ghost{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid var(--border)}
+.btn-ghost:hover{background:rgba(255,255,255,0.08)}
+.btn-sm{padding:6px 12px;font-size:0.75rem}
+.btn-danger{background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3)}
+
+#content{flex:1;overflow-y:auto;padding:1.5rem}
+
+/* SECTIONS */
+.section-page{display:none}
+.section-page.active{display:block}
+
+/* STAT CARDS */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--grad)}
+.stat-label{font-size:0.75rem;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:0.05em}
+.stat-val{font-size:1.9rem;font-weight:700;margin:0.4rem 0;line-height:1}
+.stat-sub{font-size:0.75rem;color:var(--muted)}
+.stat-icon{position:absolute;top:1.25rem;right:1.25rem;font-size:1.5rem;opacity:0.4}
+.stat-up{color:var(--success)}
+.stat-down{color:var(--red)}
+.stat-warn{color:var(--amber)}
+
+/* TABLE */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:1.5rem}
+.card-head{padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-head h3{font-size:0.95rem;font-weight:600}
+.card-body{padding:1.25rem}
+table{width:100%;border-collapse:collapse;font-size:0.82rem}
+th{color:var(--muted);font-weight:600;text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.75rem;text-transform:uppercase;letter-spacing:0.04em}
+td{padding:10px 12px;border-bottom:1px solid rgba(13,32,64,0.5);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,0.02)}
+.badge{display:inline-block;padding:3px 8px;border-radius:4px;font-size:0.7rem;font-weight:600}
+.badge-green{background:rgba(0,201,80,0.12);color:var(--success)}
+.badge-blue{background:rgba(17,78,255,0.12);color:var(--blue)}
+.badge-red{background:rgba(239,68,68,0.12);color:var(--red)}
+.badge-amber{background:rgba(245,158,11,0.12);color:var(--amber)}
+.badge-mint{background:rgba(20,241,177,0.12);color:var(--mint)}
+.badge-muted{background:rgba(100,116,139,0.15);color:var(--muted)}
+
+/* FILTER TABS */
+.filter-tabs{display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap}
+.filter-tab{padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:'DM Sans',sans-serif}
+.filter-tab.active,.filter-tab:hover{background:rgba(20,241,177,0.1);color:var(--mint);border-color:rgba(20,241,177,0.3)}
+.search-bar{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:8px 14px;color:var(--text);font-size:0.85rem;font-family:'DM Sans',sans-serif;outline:none;width:260px}
+.search-bar::placeholder{color:var(--muted)}
+.search-bar:focus{border-color:var(--mint)}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:1000;display:none;align-items:center;justify-content:center;padding:1rem}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:18px;width:100%;max-width:820px;max-height:90vh;overflow-y:auto;box-shadow:0 30px 80px rgba(0,0,0,0.5)}
+.modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--card)}
+.modal-head h3{font-size:1rem;font-weight:700}
+.modal-close{background:rgba(255,255,255,0.05);border:none;color:var(--muted);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center}
+.modal-body{padding:1.5rem}
+.detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.detail-item{background:rgba(255,255,255,0.03);border-radius:10px;padding:0.875rem}
+.detail-label{font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px}
+.detail-value{font-weight:600;font-size:0.9rem}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group label{font-size:0.75rem;color:var(--muted);font-weight:600}
+.form-group input,.form-group select,.form-group textarea{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:0.85rem;font-family:'DM Sans',sans-serif;outline:none}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--mint)}
+.form-group select option{background:#0d1f3a}
+.form-group textarea{min-height:80px;resize:vertical}
+
+/* AI ASSISTANT */
+#ai-container{display:grid;grid-template-columns:1fr 360px;gap:1.25rem;height:calc(100vh - 180px)}
+.ai-chat-panel{background:var(--card);border:1px solid var(--border);border-radius:16px;display:flex;flex-direction:column;overflow:hidden}
+.ai-chat-header{padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(20,241,177,0.05),rgba(17,78,255,0.05))}
+.ai-chat-header h3{font-size:0.95rem;font-weight:700;display:flex;align-items:center;gap:8px}
+.ai-badge{background:var(--grad);padding:3px 10px;border-radius:10px;font-size:0.65rem;font-weight:700;color:#fff}
+.ai-bond-select{width:100%;margin-top:0.75rem;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.85rem;outline:none}
+.ai-bond-select:focus{border-color:var(--mint)}
+.ai-bond-select option{background:#0d1f3a}
+.ai-messages{flex:1;overflow-y:auto;padding:1.25rem;display:flex;flex-direction:column;gap:1rem}
+.ai-msg{display:flex;gap:10px;max-width:90%}
+.ai-msg.user{align-self:flex-end;flex-direction:row-reverse}
+.ai-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;flex-shrink:0;font-weight:700}
+.ai-avatar.bot{background:var(--grad);color:#fff}
+.ai-avatar.usr{background:rgba(255,255,255,0.1);color:var(--text)}
+.ai-bubble{background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;padding:0.875rem;font-size:0.83rem;line-height:1.6}
+.ai-msg.user .ai-bubble{background:rgba(17,78,255,0.15);border-color:rgba(17,78,255,0.3)}
+.ai-bubble pre{background:rgba(0,0,0,0.3);border-radius:6px;padding:8px;overflow-x:auto;margin:6px 0;font-size:0.8rem}
+.ai-input-area{padding:1rem;border-top:1px solid var(--border);background:rgba(0,0,0,0.1)}
+.ai-input-row{display:flex;gap:8px}
+.ai-input{flex:1;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.85rem;outline:none;resize:none;min-height:44px;max-height:120px}
+.ai-input:focus{border-color:var(--mint)}
+.ai-send{background:var(--grad);border:none;border-radius:10px;width:44px;height:44px;color:#fff;cursor:pointer;font-size:1.2rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity 0.15s}
+.ai-send:hover{opacity:0.85}
+.ai-send:disabled{opacity:0.4;cursor:not-allowed}
+.quick-questions{display:flex;flex-wrap:wrap;gap:6px;padding:0.75rem 1.25rem;border-top:1px solid var(--border)}
+.quick-q{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:0.72rem;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s}
+.quick-q:hover{border-color:var(--mint);color:var(--mint);background:rgba(20,241,177,0.05)}
+.ai-docs-panel{background:var(--card);border:1px solid var(--border);border-radius:16px;display:flex;flex-direction:column;overflow:hidden}
+.ai-docs-header{padding:1rem 1.25rem;border-bottom:1px solid var(--border)}
+.ai-docs-header h4{font-size:0.85rem;font-weight:700;margin-bottom:0.75rem}
+.doc-item{padding:0.875rem;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:0.5rem;border:1px solid var(--border)}
+.doc-item-name{font-size:0.8rem;font-weight:600;margin-bottom:4px}
+.doc-item-meta{font-size:0.7rem;color:var(--muted);display:flex;gap:8px;align-items:center}
+.doc-upload-area{padding:1.25rem;border-top:1px solid var(--border);margin-top:auto}
+.upload-zone{border:2px dashed var(--border);border-radius:10px;padding:1.5rem;text-align:center;cursor:pointer;transition:all 0.2s}
+.upload-zone:hover{border-color:var(--mint);background:rgba(20,241,177,0.03)}
+.upload-zone-text{font-size:0.8rem;color:var(--muted);margin-top:0.5rem}
+.loading-dots::after{content:'.';animation:dots 1.2s infinite}
+@keyframes dots{0%,100%{content:'.'} 33%{content:'..'} 66%{content:'...'}}
+
+/* SETTINGS */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
+.settings-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.5rem}
+.settings-card h4{font-size:0.9rem;font-weight:700;margin-bottom:1rem;color:var(--mint)}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+
+/* TOAST */
+#toast{position:fixed;bottom:1.5rem;right:1.5rem;background:#1a2f4a;border:1px solid var(--border);border-radius:10px;padding:12px 20px;font-size:0.85rem;z-index:9999;display:none;max-width:320px}
+#toast.show{display:block;animation:slideUp 0.3s ease}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+.empty-state{text-align:center;padding:3rem;color:var(--muted)}
+.empty-state .icon{font-size:3rem;margin-bottom:1rem;opacity:0.4}
+</style>
+</head>
+<body>
+<script>
+window.addEventListener('DOMContentLoaded',function(){if(window.frappe){if(frappe.msgprint)frappe.msgprint=function(){};if(frappe.throw)frappe.throw=function(){};}});
+window.addEventListener('unhandledrejection',function(e){e.preventDefault();});
+</script>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-text">Bizaxl <span>Bond</span></div>
+    <div class="sidebar-logo-sub">Fixed Income Platform</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-item active" onclick="showSection('dashboard')"><span class="nav-icon">📊</span>Dashboard</div>
+    <div class="nav-item" onclick="showSection('bonds')"><span class="nav-icon">📋</span>Bonds</div>
+    <div class="nav-item" onclick="showSection('coupons')"><span class="nav-icon">🧾</span>Coupon Schedule</div>
+    <div class="nav-item" onclick="showSection('clients')"><span class="nav-icon">👥</span>Clients</div>
+    <div class="nav-item" onclick="showSection('portfolio')"><span class="nav-icon">💼</span>Portfolio</div>
+    <div class="nav-item" onclick="showSection('transactions')"><span class="nav-icon">📈</span>Transactions</div>
+    <div class="nav-item" onclick="showSection('settlements')"><span class="nav-icon">🏦</span>Settlements</div>
+    <div class="nav-item" onclick="showSection('contracts')"><span class="nav-icon">📄</span>Contract Notes</div>
+    <div class="nav-item" onclick="showSection('invoices')"><span class="nav-icon">🧾</span>Invoices</div>
+    <div class="nav-item" onclick="showSection('ledger')"><span class="nav-icon">📒</span>Ledger</div>
+    <div class="nav-item" onclick="showSection('esg')"><span class="nav-icon">🌿</span>ESG Bonds</div>
+    <div class="nav-item" onclick="showSection('ai')"><span class="nav-icon">🤖</span>AI Bond Assistant</div>
+    <div class="nav-item" onclick="showSection('settings')"><span class="nav-icon">⚙️</span>Settings</div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="sidebar-user">Bizaxl Bond Markets</div>
+    <div style="font-size:0.7rem;color:var(--muted);margin-top:2px">v1.0.0</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="topbar">
+    <h2 id="page-title">Dashboard</h2>
+    <div class="topbar-actions">
+      <a href="/bond" style="color:var(--muted);font-size:0.8rem;text-decoration:none">Customer Portal ↗</a>
+    </div>
+  </div>
+
+  <div id="content">
+
+    <!-- ── DASHBOARD ── -->
+    <div id="sec-dashboard" class="section-page active">
+      <div class="stat-grid" id="stat-grid">
+        <div class="stat-card"><div class="stat-label">Total Bonds</div><div class="stat-val" id="s-total-bonds">—</div><div class="stat-sub">Listed in platform</div><div class="stat-icon">📋</div></div>
+        <div class="stat-card"><div class="stat-label">Active Clients</div><div class="stat-val" id="s-clients">—</div><div class="stat-sub">KYC verified investors</div><div class="stat-icon">👥</div></div>
+        <div class="stat-card"><div class="stat-label">Total AUM</div><div class="stat-val" id="s-aum">—</div><div class="stat-sub">Assets under management</div><div class="stat-icon">💰</div></div>
+        <div class="stat-card"><div class="stat-label">Upcoming Coupons</div><div class="stat-val stat-up" id="s-coupons">—</div><div class="stat-sub">Next 7 days</div><div class="stat-icon">📅</div></div>
+        <div class="stat-card"><div class="stat-label">Overdue Coupons</div><div class="stat-val stat-down" id="s-overdue">—</div><div class="stat-sub">Pending payment</div><div class="stat-icon">⚠️</div></div>
+        <div class="stat-card"><div class="stat-label">ESG Bonds</div><div class="stat-val stat-up" id="s-esg">—</div><div class="stat-sub">Green, Blue, Social etc.</div><div class="stat-icon">🌿</div></div>
+        <div class="stat-card"><div class="stat-label">Today Settlements</div><div class="stat-val" id="s-settlements">—</div><div class="stat-sub">Pending settlement</div><div class="stat-icon">🏦</div></div>
+        <div class="stat-card"><div class="stat-label">Monthly Interest</div><div class="stat-val" id="s-interest">—</div><div class="stat-sub">Payable this month</div><div class="stat-icon">💸</div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Recent Bonds</h3><button class="btn btn-grad btn-sm" onclick="showSection('bonds')">View All</button></div>
+        <div style="overflow-x:auto">
+          <table><thead><tr><th>Bond Name</th><th>ISIN</th><th>Issuer</th><th>Type</th><th>Coupon</th><th>Maturity</th><th>Rating</th><th>Status</th></tr></thead>
+          <tbody id="dash-bonds-body"></tbody></table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Upcoming Coupon Payments</h3><button class="btn btn-ghost btn-sm" onclick="showSection('coupons')">View Schedule</button></div>
+        <div style="overflow-x:auto">
+          <table><thead><tr><th>Bond</th><th>ISIN</th><th>Coupon Date</th><th>Rate</th><th>Amount/Unit</th><th>Total</th><th>Status</th></tr></thead>
+          <tbody id="dash-coupons-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── BONDS ── -->
+    <div id="sec-bonds" class="section-page">
+      <div style="display:flex;gap:1rem;margin-bottom:1rem;align-items:center;flex-wrap:wrap">
+        <input class="search-bar" id="bond-search" placeholder="🔍 Search by bond name or ISIN..." oninput="filterBonds()">
+        <div style="flex:1"></div>
+        <button class="btn btn-grad" onclick="openAddBond()">+ Add Bond</button>
+      </div>
+      <div class="filter-tabs" id="bond-filter-tabs">
+        <button class="filter-tab active" onclick="setBondFilter('all',this)">All</button>
+        <button class="filter-tab" onclick="setBondFilter('Government Bond',this)">Government</button>
+        <button class="filter-tab" onclick="setBondFilter('Corporate Bond',this)">Corporate</button>
+        <button class="filter-tab" onclick="setBondFilter('esg',this)">Green/ESG</button>
+        <button class="filter-tab" onclick="setBondFilter('Zero Coupon',this)">Zero Coupon</button>
+        <button class="filter-tab" onclick="setBondFilter('Convertible',this)">Convertible</button>
+      </div>
+      <div class="card">
+        <div style="overflow-x:auto">
+          <table><thead><tr><th>Bond Name</th><th>ISIN</th><th>Issuer</th><th>Type</th><th>Coupon</th><th>Frequency</th><th>Maturity</th><th>Rating</th><th>Currency</th><th>ESG</th><th>Action</th></tr></thead>
+          <tbody id="bonds-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── COUPON SCHEDULE ── -->
+    <div id="sec-coupons" class="section-page">
+      <div style="display:flex;gap:1rem;margin-bottom:1rem;align-items:center;flex-wrap:wrap">
+        <select class="search-bar" id="coupon-status-filter" onchange="loadCoupons()" style="width:180px">
+          <option value="">All Status</option>
+          <option value="Upcoming">Upcoming</option>
+          <option value="Paid">Paid</option>
+          <option value="Overdue">Overdue</option>
+        </select>
+        <div style="flex:1"></div>
+        <button class="btn btn-grad btn-sm" onclick="getUpcomingCoupons()">Next 7 Days</button>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Coupon Schedule</h3></div>
+        <div style="overflow-x:auto">
+          <table><thead><tr><th>Bond</th><th>ISIN</th><th>#</th><th>Coupon Date</th><th>Payment Date</th><th>Rate</th><th>Amount/Unit</th><th>Total Amount</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody id="coupons-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CLIENTS ── -->
+    <div id="sec-clients" class="section-page">
+      <div style="display:flex;gap:1rem;margin-bottom:1rem;align-items:center">
+        <input class="search-bar" id="client-search" placeholder="🔍 Search clients..." oninput="loadClients()">
+        <select class="search-bar" id="kyc-filter" onchange="loadClients()" style="width:160px">
+          <option value="">All KYC</option>
+          <option value="Verified">Verified</option>
+          <option value="Pending">Pending</option>
+          <option value="Expired">Expired</option>
+        </select>
+        <div style="flex:1"></div>
+        <button class="btn btn-grad" onclick="openAddClient()">+ Add Client</button>
+      </div>
+      <div class="card">
+        <div style="overflow-x:auto">
+          <table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Type</th><th>PAN</th><th>KYC</th><th>Invested</th><th>Current Value</th><th>Bonds</th><th>RM</th><th>Action</th></tr></thead>
+          <tbody id="clients-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PORTFOLIO ── -->
+    <div id="sec-portfolio" class="section-page">
+      <div style="display:flex;gap:1rem;margin-bottom:1rem;align-items:center">
+        <select class="search-bar" id="portfolio-client" onchange="loadHoldings()" style="width:280px"><option value="">Select Client</option></select>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Bond Holdings</h3></div>
+        <div style="overflow-x:auto">
+          <table><thead><tr><th>Bond</th><th>ISIN</th><th>Qty</th><th>Purchase Price</th><th>Purchase Amt</th><th>Current Value</th><th>Accrued Interest</th><th>P&L</th><th>P&L %</th><th>Maturity</th><th>Next Coupon</th><th>Status</th></tr></thead>
+          <tbody id="holdings-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TRANSACTIONS ── -->
+    <div id="sec-transactions" class="section-page">
+      <div style="display:flex;gap:1rem;margin-bottom:1rem;align-items:center">
+        <select class="search-bar" id="txn-client" onchange="loadTransactions()" style="width:250px"><option value="">Select Client</option></select>
+      </div>
+      <div class="card">
+        <div style="overflow-x:auto">
+          <table><thead><tr><th>Date</th><th>Type</th><th>Bond</th><th>ISIN</th><th>Qty</th><th>Price</th><th>Accrued Int</th><th>Net Amount</th><th>YTM</th><th>Trade ID</th></tr></thead>
+          <tbody id="txn-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SETTLEMENTS ── -->
+    <div id="sec-settlements" class="section-page">
+      <div style="display:flex;gap:1rem;margin-bottom:1rem;align-items:center">
+        <input type="date" class="search-bar" id="settle-date" style="width:180px" onchange="loadSettlements()">
+        <select class="search-bar" id="settle-status" onchange="loadSettlements()" style="width:180px">
+          <option value="">All Status</option>
+          <option>Pending</option><option>Settled</option><option>Failed</option>
+        </select>
+      </div>
+      <div class="card">
+        <div style="overflow-x:auto">
+          <table><thead><tr><th>Date</th><th>Type</th><th>Bond</th><th>Buyer</th><th>Seller</th><th>Qty</th><th>Clean Price</th><th>Settlement Amt</th><th>Net Payable</th><th>Status</th><th>Ref</th></tr></thead>
+          <tbody id="settle-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CONTRACTS ── -->
+    <div id="sec-contracts" class="section-page">
+      <div class="card">
+        <div class="card-head"><h3>Contract Notes</h3></div>
+        <div style="overflow-x:auto">
+          <table><thead><tr><th>Client</th><th>Date</th><th>Bond</th><th>Type</th><th>Qty</th><th>Clean Price</th><th>Consideration</th><th>Net Obligation</th><th>Due Date</th><th>Status</th></tr></thead>
+          <tbody id="contracts-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── INVOICES ── -->
+    <div id="sec-invoices" class="section-page">
+      <div class="card">
+        <div class="card-head"><h3>Invoices</h3></div>
+        <div style="overflow-x:auto">
+          <table><thead><tr><th>Client</th><th>Invoice Date</th><th>Period</th><th>Brokerage</th><th>Total</th><th>GST</th><th>Grand Total</th><th>Status</th></tr></thead>
+          <tbody id="invoices-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── LEDGER ── -->
+    <div id="sec-ledger" class="section-page">
+      <div style="display:flex;gap:1rem;margin-bottom:1rem">
+        <select class="search-bar" id="ledger-client" onchange="loadLedger()" style="width:250px"><option value="">Select Client</option></select>
+      </div>
+      <div class="card">
+        <div style="overflow-x:auto">
+          <table><thead><tr><th>Date</th><th>Type</th><th>Narration</th><th>Ref Type</th><th>Ref No</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead>
+          <tbody id="ledger-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ESG BONDS ── -->
+    <div id="sec-esg" class="section-page">
+      <div class="filter-tabs" id="esg-filter-tabs">
+        <button class="filter-tab active" onclick="setEsgFilter('all',this)">All ESG</button>
+        <button class="filter-tab" onclick="setEsgFilter('Green Bond',this)">🌿 Green</button>
+        <button class="filter-tab" onclick="setEsgFilter('Blue Bond',this)">🌊 Blue</button>
+        <button class="filter-tab" onclick="setEsgFilter('Social Bond',this)">🤝 Social</button>
+        <button class="filter-tab" onclick="setEsgFilter('Sustainability Bond',this)">♻️ Sustainability</button>
+        <button class="filter-tab" onclick="setEsgFilter('Climate Bond',this)">🌡️ Climate</button>
+      </div>
+      <div class="card">
+        <div style="overflow-x:auto">
+          <table><thead><tr><th>Bond</th><th>ISIN</th><th>Issuer</th><th>ESG Type</th><th>Currency</th><th>Amount</th><th>Rating</th><th>Use of Proceeds</th></tr></thead>
+          <tbody id="esg-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── AI BOND ASSISTANT ── -->
+    <div id="sec-ai" class="section-page">
+      <div id="ai-container">
+        <div class="ai-chat-panel">
+          <div class="ai-chat-header">
+            <h3>🤖 AI Bond Assistant <span class="ai-badge">Claude AI</span></h3>
+            <select class="ai-bond-select" id="ai-bond-select" onchange="onBondSelected()">
+              <option value="">— Select a Bond —</option>
+            </select>
+          </div>
+          <div class="ai-messages" id="ai-messages">
+            <div class="empty-state">
+              <div class="icon">🤖</div>
+              <div style="font-weight:600;margin-bottom:8px">AI Bond Assistant</div>
+              <div style="font-size:0.85rem">Select a bond above, upload its prospectus, and ask any question about its terms, covenants, coupon structure, ESG classification, or risk factors.</div>
+            </div>
+          </div>
+          <div class="quick-questions" id="quick-questions">
+            <div class="quick-q" onclick="askQuick('What is the coupon rate and payment schedule?')">Coupon schedule?</div>
+            <div class="quick-q" onclick="askQuick('When is the next coupon payment date and amount?')">Next payment?</div>
+            <div class="quick-q" onclick="askQuick('Show the amortization schedule and principal repayments')">Amortization?</div>
+            <div class="quick-q" onclick="askQuick('What are the top 5 risk factors for this bond?')">Risk factors?</div>
+            <div class="quick-q" onclick="askQuick('Explain all covenants and restrictions in this bond')">Covenants?</div>
+            <div class="quick-q" onclick="askQuick('What is the ESG classification and use of proceeds?')">ESG details?</div>
+            <div class="quick-q" onclick="askQuick('Calculate the yield to maturity assuming current market price')">Calc YTM?</div>
+            <div class="quick-q" onclick="askQuick('What are the call option terms and call dates?')">Call option?</div>
+          </div>
+          <div class="ai-input-area">
+            <div style="font-size:0.72rem;color:var(--muted);margin-bottom:8px" id="ai-status">Ready to answer questions about bond documents</div>
+            <div class="ai-input-row">
+              <textarea class="ai-input" id="ai-input" placeholder="Ask anything about this bond — terms, coupons, covenants, ESG, risk factors..." rows="1"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiQuestion()}"
+                oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+              <button class="ai-send" id="ai-send-btn" onclick="sendAiQuestion()" title="Send">➤</button>
+            </div>
+            <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%" onclick="clearChat()">Clear Chat</button>
+          </div>
+        </div>
+        <div class="ai-docs-panel">
+          <div class="ai-docs-header">
+            <h4>📁 Bond Documents</h4>
+            <div id="docs-list" style="max-height:300px;overflow-y:auto">
+              <div class="empty-state" style="padding:1rem">
+                <div style="font-size:0.8rem">Select a bond to view its documents</div>
+              </div>
+            </div>
+          </div>
+          <div class="doc-upload-area">
+            <div style="margin-bottom:0.75rem">
+              <label style="font-size:0.75rem;color:var(--muted);font-weight:600;display:block;margin-bottom:6px">Upload New Document</label>
+              <input type="text" id="doc-name-input" class="search-bar" placeholder="Document name (e.g. Prospectus 2024)" style="width:100%;margin-bottom:8px">
+              <select id="doc-type-input" style="width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.85rem;outline:none">
+                <option>Prospectus</option>
+                <option>Information Memorandum</option>
+                <option>Term Sheet</option>
+                <option>ESG Report</option>
+                <option>Credit Rating Report</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="upload-zone" onclick="document.getElementById('doc-file').click()">
+              <div style="font-size:1.5rem">📄</div>
+              <div class="upload-zone-text">Click to upload PDF / Word / Text<br>(200-2000 page prospectus supported)</div>
+              <input type="file" id="doc-file" style="display:none" accept=".pdf,.doc,.docx,.txt" onchange="uploadDocument(this)">
+            </div>
+            <div id="upload-status" style="font-size:0.75rem;color:var(--muted);margin-top:8px;text-align:center"></div>
+            <button class="btn btn-grad" style="width:100%;margin-top:0.75rem" id="process-btn" onclick="processDocument()" disabled>
+              🔄 Process with AI
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS ── -->
+    <div id="sec-settings" class="section-page">
+      <div class="settings-grid">
+        <div class="settings-card">
+          <h4>Company Details</h4>
+          <div style="display:flex;flex-direction:column;gap:0.75rem">
+            <div class="form-group"><label>Company Name</label><input type="text" id="set-company"></div>
+            <div class="form-group"><label>Tagline</label><input type="text" id="set-tagline"></div>
+            <div class="form-group"><label>SEBI Registration</label><input type="text" id="set-sebi"></div>
+            <div class="form-group"><label>Phone</label><input type="text" id="set-phone"></div>
+            <div class="form-group"><label>Email</label><input type="text" id="set-email"></div>
+            <div class="form-group"><label>Address</label><textarea id="set-address"></textarea></div>
+            <div class="form-group"><label>GSTIN</label><input type="text" id="set-gstin"></div>
+            <div class="form-group"><label>UPI ID</label><input type="text" id="set-upi"></div>
+          </div>
+        </div>
+        <div class="settings-card">
+          <h4>🤖 AI & Notification Settings</h4>
+          <div style="display:flex;flex-direction:column;gap:0.75rem">
+            <div class="form-group"><label>Claude API Key *</label><input type="password" id="set-apikey" placeholder="sk-ant-..."></div>
+            <div class="form-group"><label>AI Model</label><input type="text" id="set-model" placeholder="claude-sonnet-4-20250514"></div>
+            <div class="form-group"><label>Max Tokens Per Query</label><input type="number" id="set-tokens"></div>
+            <div class="form-group"><label>WhatsApp Number</label><input type="text" id="set-wa"></div>
+            <div class="form-group"><label>Monthly Statement Day</label><input type="number" id="set-stmt-day"></div>
+            <div class="form-group"><label>Coupon Reminder Days Before</label><input type="number" id="set-reminder"></div>
+            <div class="form-group"><label>Working Days</label><input type="text" id="set-working" placeholder="Monday,Tuesday,..."></div>
+          </div>
+          <button class="btn btn-grad" style="width:100%;margin-top:1.5rem" onclick="saveSettings()">💾 Save Settings</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- BOND DETAIL MODAL -->
+<div class="modal-overlay" id="bond-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modal-bond-title">Bond Details</h3>
+      <button class="modal-close" onclick="closeModal('bond-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="modal-bond-body"></div>
+  </div>
+</div>
+
+<!-- ADD BOND MODAL -->
+<div class="modal-overlay" id="add-bond-modal">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-head">
+      <h3>Add New Bond</h3>
+      <button class="modal-close" onclick="closeModal('add-bond-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Bond Name *</label><input type="text" id="ab-name" placeholder="HDFC Bank Bond 2034"></div>
+        <div class="form-group"><label>ISIN</label><input type="text" id="ab-isin" placeholder="INE040A08382"></div>
+        <div class="form-group"><label>Issuer Name *</label><input type="text" id="ab-issuer"></div>
+        <div class="form-group"><label>Issuer Type</label><select id="ab-issuer-type"><option>Corporate</option><option>Central Government</option><option>State Government</option><option>Municipal</option><option>Supranational</option><option>Financial Institution</option><option>NBFC</option><option>PSU</option></select></div>
+        <div class="form-group"><label>Bond Type</label><select id="ab-bond-type"><option>Corporate Bond</option><option>Government Bond</option><option>Zero Coupon</option><option>Convertible</option><option>Amortizing</option><option>Inflation Indexed</option><option>Callable</option><option>Puttable</option><option>Perpetual</option></select></div>
+        <div class="form-group"><label>Issue Date</label><input type="date" id="ab-issue-date"></div>
+        <div class="form-group"><label>Maturity Date</label><input type="date" id="ab-maturity-date"></div>
+        <div class="form-group"><label>Principal Amount</label><input type="number" id="ab-principal"></div>
+        <div class="form-group"><label>Face Value</label><input type="number" id="ab-facevalue"></div>
+        <div class="form-group"><label>Issue Currency</label><select id="ab-currency"><option>INR</option><option>USD</option><option>EUR</option><option>GBP</option><option>SGD</option></select></div>
+        <div class="form-group"><label>Coupon Type</label><select id="ab-coupon-type"><option>Fixed</option><option>Floating</option><option>Zero Coupon</option><option>Step-Up</option><option>Step-Down</option><option>Index Linked</option><option>Variable</option></select></div>
+        <div class="form-group"><label>Coupon Rate (%)</label><input type="number" step="0.01" id="ab-coupon-rate"></div>
+        <div class="form-group"><label>Coupon Frequency</label><select id="ab-coupon-freq"><option>Annual</option><option>Semi-Annual</option><option>Quarterly</option><option>Monthly</option><option>At Maturity</option><option>Zero</option></select></div>
+        <div class="form-group"><label>Credit Rating</label><input type="text" id="ab-rating" placeholder="AAA, AA+, BBB..."></div>
+        <div class="form-group"><label>Rating Agency</label><select id="ab-rating-agency"><option>CRISIL</option><option>ICRA</option><option>CARE</option><option>India Ratings</option><option>S&P</option><option>Moody's</option><option>Fitch</option></select></div>
+        <div class="form-group"><label>ESG Classification</label><select id="ab-esg"><option>None</option><option>Green Bond</option><option>Blue Bond</option><option>Social Bond</option><option>Sustainability Bond</option><option>Gender Equality Bond</option><option>Climate Bond</option><option>Pandemic Bond</option><option>Transition Bond</option></select></div>
+        <div class="form-group"><label>Exchange Listing</label><select id="ab-listing"><option>NSE</option><option>BSE</option><option>NSE+BSE</option><option>OTC</option><option>Unlisted</option></select></div>
+        <div class="form-group"><label>Day Count Convention</label><select id="ab-daycount"><option>Actual/Actual</option><option>Actual/360</option><option>Actual/365</option><option>30/360</option></select></div>
+        <div class="form-group"><label>Governing Law</label><select id="ab-law"><option>Indian Law</option><option>UK English Law</option><option>New York Law</option></select></div>
+      </div>
+      <div class="form-group" style="margin-top:1rem"><label>Use of Proceeds</label><textarea id="ab-proceeds" placeholder="Describe how bond proceeds will be used..."></textarea></div>
+      <div class="form-group" style="margin-top:0.75rem"><label>Remarks</label><textarea id="ab-remarks"></textarea></div>
+      <button class="btn btn-grad" style="width:100%;margin-top:1.5rem" onclick="saveBond()">Save Bond →</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLIENT DETAIL MODAL -->
+<div class="modal-overlay" id="client-modal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modal-client-title">Client Details</h3><button class="modal-close" onclick="closeModal('client-modal')">✕</button></div>
+    <div class="modal-body" id="modal-client-body"></div>
+  </div>
+</div>
+
+<!-- ADD CLIENT MODAL -->
+<div class="modal-overlay" id="add-client-modal">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-head"><h3>Add New Client</h3><button class="modal-close" onclick="closeModal('add-client-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Full Name *</label><input type="text" id="ac-name"></div>
+        <div class="form-group"><label>Email *</label><input type="email" id="ac-email"></div>
+        <div class="form-group"><label>Phone</label><input type="text" id="ac-phone"></div>
+        <div class="form-group"><label>Client Type</label><select id="ac-type"><option>Individual</option><option>HUF</option><option>Corporate</option><option>FII</option><option>FPI</option><option>Mutual Fund</option><option>NRI</option></select></div>
+        <div class="form-group"><label>PAN Number</label><input type="text" id="ac-pan"></div>
+        <div class="form-group"><label>KYC Status</label><select id="ac-kyc"><option>Pending</option><option>Verified</option><option>Expired</option></select></div>
+        <div class="form-group"><label>Demat Account</label><input type="text" id="ac-demat"></div>
+        <div class="form-group"><label>DP Name</label><select id="ac-dp"><option>CDSL</option><option>NSDL</option></select></div>
+        <div class="form-group"><label>Bank Name</label><input type="text" id="ac-bank"></div>
+        <div class="form-group"><label>IFSC Code</label><input type="text" id="ac-ifsc"></div>
+        <div class="form-group"><label>Risk Profile</label><select id="ac-risk"><option>Conservative</option><option>Moderate</option><option>Aggressive</option></select></div>
+        <div class="form-group"><label>Relationship Manager</label><input type="text" id="ac-rm"></div>
+      </div>
+      <button class="btn btn-grad" style="width:100%;margin-top:1.5rem" onclick="saveClient()">Save Client →</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── UTILS ──
+function getCsrf(){const v=document.cookie.match('(^|;)\\s*csrf_token\\s*=\\s*([^;]+)');return v?v.pop():'';}
+async function post(method,params){
+  const fd=new URLSearchParams();
+  Object.entries(params||{}).forEach(([k,v])=>fd.append(k,typeof v==='object'?JSON.stringify(v):String(v)));
+  const r=await fetch('/api/method/'+method,{method:'POST',credentials:'same-origin',
+    headers:{'Content-Type':'application/x-www-form-urlencoded','X-Frappe-CSRF-Token':getCsrf()},body:fd});
+  const d=await r.json();return d.message;
+}
+function fmt(n){if(!n&&n!==0)return '—';if(n>=10000000)return '₹'+(n/10000000).toFixed(2)+'Cr';if(n>=100000)return '₹'+(n/100000).toFixed(1)+'L';return '₹'+Number(n).toLocaleString('en-IN');}
+function fmtUSD(n){if(!n&&n!==0)return '—';return '$'+Number(n).toLocaleString();}
+function fmtN(n){if(n===null||n===undefined||n==='')return '—';return n;}
+function fmtD(d){if(!d)return '—';return new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});}
+function showToast(msg,type){const t=document.getElementById('toast');t.textContent=msg;t.style.borderColor=type==='error'?'#ef4444':type==='success'?'#00C950':'#0d2040';t.className='show';setTimeout(()=>t.className='',3000);}
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+// ── NAVIGATION ──
+const pageTitles={dashboard:'Dashboard',bonds:'Bonds',coupons:'Coupon Schedule',clients:'Clients',portfolio:'Portfolio / Holdings',transactions:'Transactions',settlements:'Settlements',contracts:'Contract Notes',invoices:'Invoices',ledger:'Ledger',esg:'ESG Bonds',ai:'🤖 AI Bond Assistant',settings:'Settings'};
+function showSection(name){
+  document.querySelectorAll('.section-page').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('sec-'+name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{if(n.textContent.trim().toLowerCase().includes(name.toLowerCase().slice(0,5))){n.classList.add('active');}});
+  document.getElementById('page-title').textContent=pageTitles[name]||name;
+  loadSection(name);
+}
+
+function loadSection(name){
+  if(name==='dashboard')loadDashboard();
+  else if(name==='bonds')loadBonds();
+  else if(name==='coupons')loadCoupons();
+  else if(name==='clients')loadClients();
+  else if(name==='portfolio')loadPortfolioClients();
+  else if(name==='transactions')loadTxnClients();
+  else if(name==='settlements')loadSettlements();
+  else if(name==='contracts')loadContracts();
+  else if(name==='invoices')loadInvoices();
+  else if(name==='ledger')loadLedgerClients();
+  else if(name==='esg')loadEsg();
+  else if(name==='ai')loadAi();
+  else if(name==='settings')loadSettings();
+}
+
+// ── DASHBOARD ──
+async function loadDashboard(){
+  try{
+    const s=await post('bond_app.api.get_dashboard_stats',{});
+    if(!s)return;
+    document.getElementById('s-total-bonds').textContent=s.total_bonds||0;
+    document.getElementById('s-clients').textContent=s.total_clients||0;
+    document.getElementById('s-aum').textContent=s.total_aum?fmt(s.total_aum):'₹0';
+    document.getElementById('s-coupons').textContent=s.upcoming_coupons_7days||0;
+    document.getElementById('s-overdue').textContent=s.overdue_coupons||0;
+    document.getElementById('s-esg').textContent=s.esg_bonds_count||0;
+    document.getElementById('s-settlements').textContent=s.today_settlements||0;
+    document.getElementById('s-interest').textContent=s.monthly_interest?fmt(s.monthly_interest):'₹0';
+  }catch(e){}
+  // Load bond preview
+  const bonds=await post('bond_app.api.get_bonds',{});
+  const tbody=document.getElementById('dash-bonds-body');
+  if(!bonds||!bonds.length){tbody.innerHTML='<tr><td colspan="8" class="empty-state">No bonds yet</td></tr>';return;}
+  tbody.innerHTML=bonds.slice(0,5).map(b=>`<tr>
+    <td style="font-weight:600">${b.bond_name||b.name}</td>
+    <td style="font-family:monospace;font-size:0.75rem">${b.isin||'—'}</td>
+    <td>${b.issuer_name||'—'}</td>
+    <td>${renderBondTypeBadge(b.bond_type)}</td>
+    <td style="font-weight:700;color:var(--mint)">${b.coupon_rate||0}%</td>
+    <td>${fmtD(b.maturity_date)}</td>
+    <td><span class="badge badge-mint">${b.credit_rating||'—'}</span></td>
+    <td>${b.is_active?'<span class="badge badge-green">Active</span>':'<span class="badge badge-muted">Inactive</span>'}</td>
+  </tr>`).join('');
+  // Coupons
+  const coupons=await post('bond_app.api.get_upcoming_coupons',{days:30});
+  const ctbody=document.getElementById('dash-coupons-body');
+  if(!coupons||!coupons.length){ctbody.innerHTML='<tr><td colspan="7" class="empty-state">No upcoming coupons</td></tr>';return;}
+  ctbody.innerHTML=coupons.slice(0,5).map(c=>`<tr>
+    <td style="font-weight:600">${c.bond_name||'—'}</td>
+    <td style="font-family:monospace;font-size:0.75rem">${c.isin||'—'}</td>
+    <td>${fmtD(c.coupon_date)}</td>
+    <td>${c.coupon_rate_applicable||0}%</td>
+    <td>${fmt(c.coupon_amount_per_unit)}</td>
+    <td>${fmt(c.total_coupon_amount)}</td>
+    <td>${renderStatusBadge(c.status)}</td>
+  </tr>`).join('');
+}
+
+// ── BONDS ──
+let allBonds=[],bondFilter='all';
+async function loadBonds(){
+  try{allBonds=await post('bond_app.api.get_bonds',{})||[];}catch(e){allBonds=[];}
+  renderBonds();
+}
+function setBondFilter(f,el){
+  bondFilter=f;
+  document.querySelectorAll('#bond-filter-tabs .filter-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderBonds();
+}
+function filterBonds(){renderBonds();}
+function renderBonds(){
+  const search=document.getElementById('bond-search').value.toLowerCase();
+  let bonds=allBonds;
+  if(bondFilter==='esg')bonds=bonds.filter(b=>b.esg_classification&&b.esg_classification!=='None');
+  else if(bondFilter!=='all')bonds=bonds.filter(b=>b.bond_type===bondFilter);
+  if(search)bonds=bonds.filter(b=>(b.bond_name||'').toLowerCase().includes(search)||(b.isin||'').toLowerCase().includes(search));
+  const tbody=document.getElementById('bonds-body');
+  if(!bonds.length){tbody.innerHTML='<tr><td colspan="11" class="empty-state"><div class="icon">📋</div>No bonds found</td></tr>';return;}
+  tbody.innerHTML=bonds.map(b=>`<tr>
+    <td style="font-weight:600;white-space:nowrap">${b.bond_name||b.name}</td>
+    <td style="font-family:monospace;font-size:0.72rem">${b.isin||'—'}</td>
+    <td style="white-space:nowrap">${b.issuer_name||'—'}</td>
+    <td>${renderBondTypeBadge(b.bond_type)}</td>
+    <td style="font-weight:700;color:var(--mint)">${b.coupon_rate||0}%</td>
+    <td style="font-size:0.78rem">${b.coupon_frequency||'—'}</td>
+    <td style="white-space:nowrap">${fmtD(b.maturity_date)}</td>
+    <td><span class="badge badge-mint">${b.credit_rating||'—'}</span></td>
+    <td>${b.issue_currency||'INR'}</td>
+    <td>${b.esg_classification&&b.esg_classification!=='None'?'<span class="badge badge-green">'+b.esg_classification+'</span>':'—'}</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="viewBond('${b.name||b.bond_name}')">View</button></td>
+  </tr>`).join('');
+}
+async function viewBond(name){
+  const b=await post('bond_app.api.get_bond_detail',{bond_name:name});
+  if(!b){showToast('Could not load bond details','error');return;}
+  document.getElementById('modal-bond-title').textContent=b.bond_name||name;
+  const coupons=await post('bond_app.api.get_coupon_schedule',{bond_name:name});
+  document.getElementById('modal-bond-body').innerHTML=`
+    <div class="detail-grid" style="margin-bottom:1.5rem">
+      <div class="detail-item"><div class="detail-label">ISIN</div><div class="detail-value" style="font-family:monospace">${fmtN(b.isin)}</div></div>
+      <div class="detail-item"><div class="detail-label">Issuer</div><div class="detail-value">${fmtN(b.issuer_name)}</div></div>
+      <div class="detail-item"><div class="detail-label">Bond Type</div><div class="detail-value">${fmtN(b.bond_type)}</div></div>
+      <div class="detail-item"><div class="detail-label">Issue Date</div><div class="detail-value">${fmtD(b.issue_date)}</div></div>
+      <div class="detail-item"><div class="detail-label">Maturity Date</div><div class="detail-value">${fmtD(b.maturity_date)}</div></div>
+      <div class="detail-item"><div class="detail-label">Issue Currency</div><div class="detail-value">${fmtN(b.issue_currency)}</div></div>
+      <div class="detail-item"><div class="detail-label">Principal Amount</div><div class="detail-value">${fmt(b.principal_amount)}</div></div>
+      <div class="detail-item"><div class="detail-label">Total Issue Size</div><div class="detail-value">${fmt(b.total_issue_size)}</div></div>
+      <div class="detail-item"><div class="detail-label">Coupon Type</div><div class="detail-value">${fmtN(b.coupon_type)}</div></div>
+      <div class="detail-item"><div class="detail-label">Coupon Rate</div><div class="detail-value" style="color:var(--mint);font-size:1.1rem">${b.coupon_rate||0}%</div></div>
+      <div class="detail-item"><div class="detail-label">Coupon Frequency</div><div class="detail-value">${fmtN(b.coupon_frequency)}</div></div>
+      <div class="detail-item"><div class="detail-label">Credit Rating</div><div class="detail-value">${fmtN(b.credit_rating)} (${fmtN(b.credit_rating_agency)})</div></div>
+      <div class="detail-item"><div class="detail-label">Day Count</div><div class="detail-value">${fmtN(b.day_count_convention)}</div></div>
+      <div class="detail-item"><div class="detail-label">Exchange</div><div class="detail-value">${fmtN(b.exchange_listing)}</div></div>
+      <div class="detail-item"><div class="detail-label">ESG Classification</div><div class="detail-value">${fmtN(b.esg_classification)}</div></div>
+    </div>
+    ${b.use_of_proceeds?`<div style="background:rgba(20,241,177,0.05);border:1px solid rgba(20,241,177,0.15);border-radius:10px;padding:1rem;margin-bottom:1rem"><div class="detail-label">Use of Proceeds</div><div style="margin-top:4px;font-size:0.85rem">${b.use_of_proceeds}</div></div>`:''}
+    ${coupons&&coupons.length?`<div style="margin-top:1rem"><h4 style="margin-bottom:0.75rem;font-size:0.9rem">Coupon Schedule</h4><div style="overflow-x:auto"><table><thead><tr><th>#</th><th>Coupon Date</th><th>Rate</th><th>Amt/Unit</th><th>Total Amt</th><th>Status</th></tr></thead><tbody>${coupons.slice(0,8).map(c=>`<tr><td>${c.coupon_number||'—'}</td><td>${fmtD(c.coupon_date)}</td><td>${c.coupon_rate_applicable||0}%</td><td>${fmt(c.coupon_amount_per_unit)}</td><td>${fmt(c.total_coupon_amount)}</td><td>${renderStatusBadge(c.status)}</td></tr>`).join('')}</tbody></table></div></div>`:''}`;
+  openModal('bond-modal');
+}
+function openAddBond(){openModal('add-bond-modal');}
+async function saveBond(){
+  const name=document.getElementById('ab-name').value;
+  if(!name){showToast('Bond name is required','error');return;}
+  try{
+    const fd=new URLSearchParams();
+    const vals={doctype:'Bond Master',bond_name:name,isin:document.getElementById('ab-isin').value,issuer_name:document.getElementById('ab-issuer').value,issuer_type:document.getElementById('ab-issuer-type').value,bond_type:document.getElementById('ab-bond-type').value,issue_date:document.getElementById('ab-issue-date').value,maturity_date:document.getElementById('ab-maturity-date').value,principal_amount:document.getElementById('ab-principal').value,face_value:document.getElementById('ab-facevalue').value,issue_currency:document.getElementById('ab-currency').value,coupon_type:document.getElementById('ab-coupon-type').value,coupon_rate:document.getElementById('ab-coupon-rate').value,coupon_frequency:document.getElementById('ab-coupon-freq').value,credit_rating:document.getElementById('ab-rating').value,credit_rating_agency:document.getElementById('ab-rating-agency').value,esg_classification:document.getElementById('ab-esg').value,exchange_listing:document.getElementById('ab-listing').value,day_count_convention:document.getElementById('ab-daycount').value,governing_law:document.getElementById('ab-law').value,use_of_proceeds:document.getElementById('ab-proceeds').value,remarks:document.getElementById('ab-remarks').value,is_active:1};
+    fd.append('doc',JSON.stringify(vals));fd.append('action','Save');
+    await fetch('/api/method/frappe.desk.form.save.savedocs',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Frappe-CSRF-Token':getCsrf()},body:fd});
+    closeModal('add-bond-modal');showToast('Bond saved successfully!','success');loadBonds();
+  }catch(e){showToast('Error saving bond','error');}
+}
+
+// ── COUPONS ──
+async function loadCoupons(){
+  const status=document.getElementById('coupon-status-filter').value;
+  const params={};if(status)params.status=status;
+  let coupons=[];
+  try{coupons=await post('bond_app.api.get_upcoming_coupons',{days:365})||[];}catch(e){}
+  const tbody=document.getElementById('coupons-body');
+  if(!coupons.length){tbody.innerHTML='<tr><td colspan="10" class="empty-state">No coupon records</td></tr>';return;}
+  let filtered=coupons;if(status)filtered=coupons.filter(c=>c.status===status);
+  tbody.innerHTML=filtered.map(c=>`<tr>
+    <td style="font-weight:600">${c.bond_name||'—'}</td>
+    <td style="font-family:monospace;font-size:0.72rem">${c.isin||'—'}</td>
+    <td>${c.coupon_number||'—'}</td>
+    <td>${fmtD(c.coupon_date)}</td>
+    <td>${fmtD(c.payment_date)}</td>
+    <td style="color:var(--mint)">${c.coupon_rate_applicable||0}%</td>
+    <td>${fmt(c.coupon_amount_per_unit)}</td>
+    <td>${fmt(c.total_coupon_amount)}</td>
+    <td>${renderStatusBadge(c.status)}</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="sendCouponAlert('${c.bond_name||''}','${c.isin||''}','${c.coupon_date||''}','${c.coupon_amount_per_unit||0}')">📱 Alert</button></td>
+  </tr>`).join('');
+}
+async function getUpcomingCoupons(){
+  try{
+    const coupons=await post('bond_app.api.get_upcoming_coupons',{days:7});
+    const tbody=document.getElementById('coupons-body');
+    if(!coupons||!coupons.length){tbody.innerHTML='<tr><td colspan="10">No coupons in next 7 days</td></tr>';return;}
+    tbody.innerHTML=coupons.map(c=>`<tr><td style="font-weight:600">${c.bond_name||'—'}</td><td style="font-family:monospace;font-size:0.72rem">${c.isin||'—'}</td><td>${c.coupon_number||'—'}</td><td style="color:var(--amber);font-weight:600">${fmtD(c.coupon_date)}</td><td>${fmtD(c.payment_date)}</td><td style="color:var(--mint)">${c.coupon_rate_applicable||0}%</td><td>${fmt(c.coupon_amount_per_unit)}</td><td>${fmt(c.total_coupon_amount)}</td><td>${renderStatusBadge(c.status)}</td><td>—</td></tr>`).join('');
+  }catch(e){}
+}
+async function sendCouponAlert(bond,isin,date,amt){
+  const client=prompt('Enter client name to send reminder:');if(!client)return;
+  try{const r=await post('bond_app.api.send_coupon_reminder',{client_name:client,isin,coupon_date:date,amount:amt});if(r&&r.wa_url){window.open(r.wa_url,'_blank');showToast('WhatsApp opened!','success');}
+  }catch(e){showToast('Error sending alert','error');}
+}
+
+// ── CLIENTS ──
+async function loadClients(){
+  const search=document.getElementById('client-search').value;
+  const kyc=document.getElementById('kyc-filter').value;
+  const params={};if(search)params.search=search;if(kyc)params.kyc_status=kyc;
+  let clients=[];try{clients=await post('bond_app.api.get_clients',params)||[];}catch(e){}
+  const tbody=document.getElementById('clients-body');
+  if(!clients.length){tbody.innerHTML='<tr><td colspan="11" class="empty-state"><div class="icon">👥</div>No clients found</td></tr>';return;}
+  tbody.innerHTML=clients.map(c=>`<tr>
+    <td style="font-weight:600">${c.full_name}</td>
+    <td style="font-size:0.78rem">${c.email||'—'}</td>
+    <td>${c.phone||'—'}</td>
+    <td><span class="badge badge-blue">${c.client_type||'—'}</span></td>
+    <td style="font-family:monospace;font-size:0.75rem">${c.pan_number||'—'}</td>
+    <td>${c.kyc_status==='Verified'?'<span class="badge badge-green">Verified</span>':c.kyc_status==='Pending'?'<span class="badge badge-amber">Pending</span>':'<span class="badge badge-red">Expired</span>'}</td>
+    <td>${fmt(c.total_investment)}</td>
+    <td>${fmt(c.total_current_value)}</td>
+    <td style="font-weight:600">${c.total_bonds_held||0}</td>
+    <td style="font-size:0.78rem">${c.relationship_manager||'—'}</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="viewClient('${c.name||c.full_name}','${c.full_name}')">View</button></td>
+  </tr>`).join('');
+}
+async function viewClient(name,displayName){
+  const holdings=await post('bond_app.api.get_client_holdings',{client_name:displayName});
+  document.getElementById('modal-client-title').textContent='Holdings — '+displayName;
+  document.getElementById('modal-client-body').innerHTML=!holdings||!holdings.length?'<div class="empty-state">No holdings found</div>':'<div style="overflow-x:auto"><table><thead><tr><th>Bond</th><th>ISIN</th><th>Qty</th><th>Purchase Amt</th><th>Current Value</th><th>Accrued Interest</th><th>P&L</th><th>Maturity</th><th>Status</th></tr></thead><tbody>'+holdings.map(h=>`<tr><td style="font-weight:600">${h.bond_name||'—'}</td><td style="font-family:monospace;font-size:0.72rem">${h.isin||'—'}</td><td>${h.quantity||0}</td><td>${fmt(h.purchase_amount)}</td><td>${fmt(h.current_value)}</td><td>${fmt(h.accrued_interest)}</td><td style="color:${(h.unrealized_pnl||0)>=0?'var(--success)':'var(--red)'};font-weight:600">${fmt(h.unrealized_pnl)} (${(h.unrealized_pnl_percent||0).toFixed(2)}%)</td><td style="color:${isMaturing(h.maturity_date)?'var(--red)':'var(--text)'}">${fmtD(h.maturity_date)}${isMaturing(h.maturity_date)?' ⚠️':''}</td><td>${renderStatusBadge(h.holding_status)}</td></tr>`).join('')+'</tbody></table></div>';
+  openModal('client-modal');
+}
+function isMaturing(d){if(!d)return false;const diff=(new Date(d)-new Date())/(1000*60*60*24);return diff>0&&diff<=30;}
+function openAddClient(){openModal('add-client-modal');}
+async function saveClient(){
+  const name=document.getElementById('ac-name').value;
+  if(!name){showToast('Client name is required','error');return;}
+  try{
+    const fd=new URLSearchParams();
+    const vals={doctype:'Bond Client',full_name:name,email:document.getElementById('ac-email').value,phone:document.getElementById('ac-phone').value,client_type:document.getElementById('ac-type').value,pan_number:document.getElementById('ac-pan').value,kyc_status:document.getElementById('ac-kyc').value,demat_account_number:document.getElementById('ac-demat').value,dp_name:document.getElementById('ac-dp').value,bank_name:document.getElementById('ac-bank').value,ifsc_code:document.getElementById('ac-ifsc').value,risk_profile:document.getElementById('ac-risk').value,relationship_manager:document.getElementById('ac-rm').value,is_active:1};
+    fd.append('doc',JSON.stringify(vals));fd.append('action','Save');
+    await fetch('/api/method/frappe.desk.form.save.savedocs',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Frappe-CSRF-Token':getCsrf()},body:fd});
+    closeModal('add-client-modal');showToast('Client saved!','success');loadClients();
+  }catch(e){showToast('Error saving client','error');}
+}
+
+// ── PORTFOLIO ──
+async function loadPortfolioClients(){
+  const clients=await post('bond_app.api.get_clients',{})||[];
+  const sel=document.getElementById('portfolio-client');
+  sel.innerHTML='<option value="">Select Client</option>'+clients.map(c=>`<option value="${c.full_name}">${c.full_name}</option>`).join('');
+}
+async function loadHoldings(){
+  const client=document.getElementById('portfolio-client').value;
+  if(!client)return;
+  const holdings=await post('bond_app.api.get_client_holdings',{client_name:client})||[];
+  const tbody=document.getElementById('holdings-body');
+  if(!holdings.length){tbody.innerHTML='<tr><td colspan="12" class="empty-state">No holdings</td></tr>';return;}
+  tbody.innerHTML=holdings.map(h=>`<tr>
+    <td style="font-weight:600">${h.bond_name||'—'}</td>
+    <td style="font-family:monospace;font-size:0.72rem">${h.isin||'—'}</td>
+    <td>${h.quantity||0}</td>
+    <td>${h.purchase_price||0}</td>
+    <td>${fmt(h.purchase_amount)}</td>
+    <td>${fmt(h.current_value)}</td>
+    <td>${fmt(h.accrued_interest)}</td>
+    <td style="color:${(h.unrealized_pnl||0)>=0?'var(--success)':'var(--red)';font-weight:600">${fmt(h.unrealized_pnl)}</td>
+    <td style="color:${(h.unrealized_pnl_percent||0)>=0?'var(--success)':'var(--red)'}">${(h.unrealized_pnl_percent||0).toFixed(2)}%</td>
+    <td style="color:${isMaturing(h.maturity_date)?'var(--red)':'var(--text)'}">${fmtD(h.maturity_date)}${isMaturing(h.maturity_date)?' ⚠️':''}</td>
+    <td>${fmtD(h.next_coupon_date)}</td>
+    <td>${renderStatusBadge(h.holding_status)}</td>
+  </tr>`).join('');
+}
+
+// ── TRANSACTIONS ──
+async function loadTxnClients(){
+  const clients=await post('bond_app.api.get_clients',{})||[];
+  const sel=document.getElementById('txn-client');
+  sel.innerHTML='<option value="">Select Client</option>'+clients.map(c=>`<option value="${c.full_name}">${c.full_name}</option>`).join('');
+}
+async function loadTransactions(){
+  const client=document.getElementById('txn-client').value;if(!client)return;
+  const txns=await post('bond_app.api.get_client_transactions',{client_name:client})||[];
+  const tbody=document.getElementById('txn-body');
+  if(!txns.length){tbody.innerHTML='<tr><td colspan="10" class="empty-state">No transactions</td></tr>';return;}
+  tbody.innerHTML=txns.map(t=>`<tr><td>${fmtD(t.transaction_date)}</td><td><span class="badge ${t.transaction_type==='Buy'?'badge-green':'badge-red'}">${t.transaction_type}</span></td><td>${t.bond_name||'—'}</td><td style="font-family:monospace;font-size:0.72rem">${t.isin||'—'}</td><td>${t.quantity||0}</td><td>${t.price||0}</td><td>${fmt(t.accrued_interest)}</td><td>${fmt(t.net_amount)}</td><td>${t.yield_to_maturity?t.yield_to_maturity+'%':'—'}</td><td style="font-size:0.75rem;font-family:monospace">${t.trade_id||'—'}</td></tr>`).join('');
+}
+
+// ── SETTLEMENTS ──
+async function loadSettlements(){
+  const date=document.getElementById('settle-date').value;
+  const status=document.getElementById('settle-status').value;
+  const params={};if(date)params.date=date;if(status)params.status=status;
+  const data=await post('bond_app.api.get_settlements',params)||[];
+  const tbody=document.getElementById('settle-body');
+  if(!data.length){tbody.innerHTML='<tr><td colspan="11" class="empty-state">No settlements</td></tr>';return;}
+  tbody.innerHTML=data.map(s=>`<tr><td>${fmtD(s.settlement_date)}</td><td>${s.settlement_type||'—'}</td><td>${s.bond_name||'—'}</td><td>${s.buyer_name||'—'}</td><td>${s.seller_name||'—'}</td><td>${s.quantity||0}</td><td>${s.clean_price||0}</td><td>${fmt(s.settlement_amount)}</td><td>${fmt(s.net_payable)}</td><td>${renderStatusBadge(s.settlement_status)}</td><td style="font-size:0.75rem">${s.clearing_reference||'—'}</td></tr>`).join('');
+}
+
+// ── CONTRACTS ──
+async function loadContracts(){
+  const data=await post('bond_app.api.get_contract_notes',{})||[];
+  const tbody=document.getElementById('contracts-body');
+  if(!data.length){tbody.innerHTML='<tr><td colspan="10" class="empty-state">No contract notes</td></tr>';return;}
+  tbody.innerHTML=data.map(c=>`<tr><td>${c.client_name||'—'}</td><td>${fmtD(c.contract_date)}</td><td>${c.bond_name||'—'}</td><td><span class="badge ${c.transaction_type==='Buy'?'badge-green':'badge-red'}">${c.transaction_type}</span></td><td>${c.quantity||0}</td><td>${c.clean_price||0}</td><td>${fmt(c.consideration)}</td><td style="font-weight:700">${fmt(c.net_obligation)} <span style="font-size:0.7rem;color:var(--muted)">${c.net_obligation_type||''}</span></td><td>${fmtD(c.due_date)}</td><td>${renderStatusBadge(c.payment_status)}</td></tr>`).join('');
+}
+
+// ── INVOICES ──
+async function loadInvoices(){
+  const data=await post('bond_app.api.get_invoices',{})||[];
+  const tbody=document.getElementById('invoices-body');
+  if(!data.length){tbody.innerHTML='<tr><td colspan="8" class="empty-state">No invoices</td></tr>';return;}
+  tbody.innerHTML=data.map(i=>`<tr><td>${i.client_name||'—'}</td><td>${fmtD(i.invoice_date)}</td><td style="font-size:0.78rem">${fmtD(i.period_from)} – ${fmtD(i.period_to)}</td><td>${fmt(i.brokerage_amount)}</td><td>${fmt(i.subtotal)}</td><td>${fmt(i.gst_18)}</td><td style="font-weight:700">${fmt(i.total_amount)}</td><td>${renderStatusBadge(i.payment_status)}</td></tr>`).join('');
+}
+
+// ── LEDGER ──
+async function loadLedgerClients(){
+  const clients=await post('bond_app.api.get_clients',{})||[];
+  const sel=document.getElementById('ledger-client');
+  sel.innerHTML='<option value="">Select Client</option>'+clients.map(c=>`<option value="${c.full_name}">${c.full_name}</option>`).join('');
+}
+async function loadLedger(){
+  const client=document.getElementById('ledger-client').value;if(!client)return;
+  const data=await post('bond_app.api.get_client_ledger',{client_name:client})||[];
+  const tbody=document.getElementById('ledger-body');
+  if(!data.length){tbody.innerHTML='<tr><td colspan="8" class="empty-state">No ledger entries</td></tr>';return;}
+  tbody.innerHTML=data.map(l=>`<tr><td>${fmtD(l.entry_date)}</td><td><span class="badge ${l.entry_type==='Credit'?'badge-green':'badge-red'}">${l.entry_type}</span></td><td>${l.narration||'—'}</td><td style="font-size:0.78rem">${l.reference_type||'—'}</td><td style="font-family:monospace;font-size:0.75rem">${l.reference_number||'—'}</td><td style="color:var(--red)">${l.debit_amount?fmt(l.debit_amount):'—'}</td><td style="color:var(--success)">${l.credit_amount?fmt(l.credit_amount):'—'}</td><td style="font-weight:700">${fmt(l.closing_balance)}</td></tr>`).join('');
+}
+
+// ── ESG ──
+let allEsg=[],esgFilter='all';
+async function loadEsg(){
+  allEsg=await post('bond_app.api.get_esg_bonds',{})||[];
+  renderEsg();
+}
+function setEsgFilter(f,el){
+  esgFilter=f;
+  document.querySelectorAll('#esg-filter-tabs .filter-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderEsg();
+}
+function renderEsg(){
+  let bonds=allEsg;
+  if(esgFilter!=='all')bonds=bonds.filter(b=>b.esg_classification===esgFilter);
+  const tbody=document.getElementById('esg-body');
+  if(!bonds.length){tbody.innerHTML='<tr><td colspan="8" class="empty-state"><div class="icon">🌿</div>No ESG bonds</td></tr>';return;}
+  tbody.innerHTML=bonds.map(b=>`<tr>
+    <td style="font-weight:600">${b.bond_name||b.name}</td>
+    <td style="font-family:monospace;font-size:0.72rem">${b.isin||'—'}</td>
+    <td>${b.issuer_name||'—'}</td>
+    <td><span class="badge badge-green">${b.esg_classification}</span></td>
+    <td>${b.issue_currency||'INR'}</td>
+    <td>${b.issue_currency==='USD'?fmtUSD(b.principal_amount):fmt(b.principal_amount)}</td>
+    <td><span class="badge badge-mint">${b.credit_rating||'—'}</span></td>
+    <td style="font-size:0.78rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.use_of_proceeds||'—'}</td>
+  </tr>`).join('');
+}
+
+// ── AI BOND ASSISTANT ──
+let aiSessionId='',aiSelectedBond='',lastDocName='';
+async function loadAi(){
+  const bonds=await post('bond_app.api.get_bonds',{})||[];
+  const sel=document.getElementById('ai-bond-select');
+  sel.innerHTML='<option value="">— Select a Bond —</option>'+bonds.map(b=>`<option value="${b.name||b.bond_name}">${b.bond_name||b.name} (${b.isin||''})</option>`).join('');
+}
+async function onBondSelected(){
+  aiSelectedBond=document.getElementById('ai-bond-select').value;
+  lastDocName='';
+  if(!aiSelectedBond)return;
+  aiSessionId='';
+  document.getElementById('ai-messages').innerHTML='<div class="empty-state"><div class="icon">📋</div><div>Loading documents for this bond...</div></div>';
+  await loadBondDocs();
+  document.getElementById('ai-messages').innerHTML=`<div class="ai-msg"><div class="ai-avatar bot">AI</div><div class="ai-bubble">I'm ready to answer questions about <strong>${document.getElementById('ai-bond-select').options[document.getElementById('ai-bond-select').selectedIndex].text}</strong>.<br><br>Upload the bond prospectus using the panel on the right, then ask me anything about:<br>• Coupon rates, dates & calculations<br>• Risk factors & covenants<br>• ESG classification & use of proceeds<br>• Call/put options & convertibility<br>• Day count conventions & yield calculations</div></div>`;
+}
+async function loadBondDocs(){
+  if(!aiSelectedBond)return;
+  try{
+    const docs=await post('bond_app.api.get_bond_documents',{bond_name:aiSelectedBond})||[];
+    const container=document.getElementById('docs-list');
+    if(!docs.length){container.innerHTML='<div class="empty-state" style="padding:1rem"><div style="font-size:0.8rem">No documents uploaded yet.<br>Upload the prospectus below.</div></div>';return;}
+    container.innerHTML=docs.map(d=>`<div class="doc-item">
+      <div class="doc-item-name">📄 ${d.document_name||'—'}</div>
+      <div class="doc-item-meta">
+        <span>${d.document_type||'—'}</span>
+        ${d.processing_status==='Ready'?'<span style="color:var(--success)">✅ Ready</span>':d.processing_status==='Processing'?'<span style="color:var(--amber)">⏳ Processing...</span>':'<span style="color:var(--muted)">⬆️ Uploaded</span>'}
+      </div>
+      ${d.processing_status==='Uploaded'?`<button class="btn btn-ghost btn-sm" style="margin-top:6px;width:100%" onclick="processSpecificDoc('${d.name}')">🔄 Process with AI</button>`:''}
+    </div>`).join('');
+    // Enable process button if latest doc not ready
+    const latest=docs[0];
+    if(latest&&latest.processing_status!=='Ready'){
+      lastDocName=latest.name;
+      document.getElementById('process-btn').disabled=false;
+    }
+  }catch(e){}
+}
+async function uploadDocument(input){
+  const file=input.files[0];if(!file)return;
+  if(!aiSelectedBond){showToast('Please select a bond first','error');input.value='';return;}
+  const docName=document.getElementById('doc-name-input').value||file.name;
+  const docType=document.getElementById('doc-type-input').value;
+  document.getElementById('upload-status').textContent='Uploading...';
+  try{
+    // Upload file via Frappe
+    const fd=new FormData();
+    fd.append('file',file);fd.append('is_private','0');fd.append('folder','Home');
+    const r=await fetch('/api/method/upload_file',{method:'POST',credentials:'same-origin',headers:{'X-Frappe-CSRF-Token':getCsrf()},body:fd});
+    const resp=await r.json();
+    const fileUrl=(resp.message&&resp.message.file_url)||'';
+    // Create Bond Document record
+    const docFd=new URLSearchParams();
+    const vals={doctype:'Bond Document',bond_name:aiSelectedBond,document_name:docName,document_type:docType,document_date:new Date().toISOString().split('T')[0],file_attachment:fileUrl,total_pages:0,processing_status:'Uploaded'};
+    docFd.append('doc',JSON.stringify(vals));docFd.append('action','Save');
+    const saveR=await fetch('/api/method/frappe.desk.form.save.savedocs',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Frappe-CSRF-Token':getCsrf()},body:docFd});
+    const saveData=await saveR.json();
+    lastDocName=saveData.docs&&saveData.docs[0]&&saveData.docs[0].name||'';
+    document.getElementById('upload-status').textContent='✅ Uploaded! Click "Process with AI" to extract content.';
+    document.getElementById('process-btn').disabled=false;
+    await loadBondDocs();
+  }catch(e){
+    document.getElementById('upload-status').textContent='⚠️ Upload failed. You can also paste text directly via the AI chat.';
+  }
+  input.value='';
+}
+async function processDocument(){
+  if(!lastDocName){showToast('No document to process','error');return;}
+  await processSpecificDoc(lastDocName);
+}
+async function processSpecificDoc(docName){
+  const btn=document.getElementById('process-btn');
+  const status=document.getElementById('upload-status');
+  btn.disabled=true;btn.textContent='⏳ Processing...';
+  status.textContent='🤖 Claude AI is reading the document...';
+  addAiMessage('bot','Reading document and extracting key information... <span class="loading-dots"></span>');
+  try{
+    const r=await post('bond_app.api.process_bond_document',{bond_doc_name:docName});
+    if(r&&r.status==='success'){
+      status.textContent='✅ Document processed successfully!';
+      btn.textContent='✅ Processed';
+      addAiMessage('bot','Document processed successfully! I have extracted the key terms, coupon details, risk factors, and covenants. You can now ask me anything about this bond.');
+      await loadBondDocs();
+    }else{
+      status.textContent='⚠️ Processing failed: '+(r&&r.message||'Unknown error');
+      btn.textContent='🔄 Retry';btn.disabled=false;
+      addAiMessage('bot','There was an error processing the document. Please ensure your Claude API key is configured in Settings, then try again.');
+    }
+  }catch(e){
+    status.textContent='Error: '+e.message;
+    btn.textContent='🔄 Retry';btn.disabled=false;
+  }
+}
+function addAiMessage(role,content){
+  const msgs=document.getElementById('ai-messages');
+  const emptyState=msgs.querySelector('.empty-state');
+  if(emptyState)emptyState.remove();
+  const div=document.createElement('div');
+  div.className='ai-msg'+(role==='user'?' user':'');
+  div.innerHTML=`<div class="ai-avatar ${role==='user'?'usr':'bot'}">${role==='user'?'U':'AI'}</div><div class="ai-bubble">${content}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+  return div;
+}
+function askQuick(q){
+  document.getElementById('ai-input').value=q;
+  sendAiQuestion();
+}
+async function sendAiQuestion(){
+  const input=document.getElementById('ai-input');
+  const question=input.value.trim();
+  if(!question)return;
+  if(!aiSelectedBond){showToast('Please select a bond first','error');return;}
+  input.value='';input.style.height='auto';
+  addAiMessage('user',question);
+  const statusEl=document.getElementById('ai-status');
+  statusEl.innerHTML='🤖 Claude AI is thinking<span class="loading-dots"></span>';
+  const sendBtn=document.getElementById('ai-send-btn');
+  sendBtn.disabled=true;
+  const thinkingDiv=addAiMessage('bot','<span class="loading-dots">Analyzing bond documents</span>');
+  try{
+    const r=await post('bond_app.api.ask_bond_ai',{bond_name:aiSelectedBond,question,session_id:aiSessionId});
+    thinkingDiv.remove();
+    if(r){
+      if(r.session_id)aiSessionId=r.session_id;
+      const answer=r.answer||'No answer received';
+      const sources=r.sources&&r.sources.length?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:0.72rem;color:var(--muted)">📚 Sources: ${r.sources.join(', ')}</div>`:'';
+      addAiMessage('bot',answer.replace(/\n/g,'<br>')+sources);
+    }else{
+      addAiMessage('bot','Error: No response received. Please check your Claude API key in Settings.');
+    }
+  }catch(e){
+    thinkingDiv.remove();
+    addAiMessage('bot','Error processing question: '+e.message+'. Please check your Claude API key in Settings.');
+  }
+  statusEl.textContent='Ready to answer questions about bond documents';
+  sendBtn.disabled=false;
+}
+function clearChat(){
+  document.getElementById('ai-messages').innerHTML='<div class="empty-state"><div class="icon">🤖</div><div>Chat cleared. Ask a new question about this bond.</div></div>';
+  aiSessionId='';
+}
+
+// ── SETTINGS ──
+async function loadSettings(){
+  const s=await post('bond_app.api.get_settings',{})||{};
+  document.getElementById('set-company').value=s.company_name||'';
+  document.getElementById('set-tagline').value=s.tagline||'';
+  document.getElementById('set-sebi').value=s.sebi_registration||'';
+  document.getElementById('set-phone').value=s.phone||'';
+  document.getElementById('set-email').value=s.email||'';
+  document.getElementById('set-address').value=s.address||'';
+  document.getElementById('set-gstin').value=s.gstin||'';
+  document.getElementById('set-upi').value=s.upi_id||'';
+  document.getElementById('set-apikey').value=s.claude_api_key||'';
+  document.getElementById('set-model').value=s.ai_model||'claude-sonnet-4-20250514';
+  document.getElementById('set-tokens').value=s.max_tokens_per_query||2000;
+  document.getElementById('set-wa').value=s.whatsapp_number||'';
+  document.getElementById('set-stmt-day').value=s.monthly_statement_day||1;
+  document.getElementById('set-reminder').value=s.coupon_reminder_days_before||3;
+  document.getElementById('set-working').value=s.working_days||'';
+}
+async function saveSettings(){
+  try{
+    const params={
+      company_name:document.getElementById('set-company').value,
+      tagline:document.getElementById('set-tagline').value,
+      sebi_registration:document.getElementById('set-sebi').value,
+      phone:document.getElementById('set-phone').value,
+      email:document.getElementById('set-email').value,
+      address:document.getElementById('set-address').value,
+      gstin:document.getElementById('set-gstin').value,
+      upi_id:document.getElementById('set-upi').value,
+      claude_api_key:document.getElementById('set-apikey').value,
+      ai_model:document.getElementById('set-model').value,
+      max_tokens_per_query:document.getElementById('set-tokens').value,
+      whatsapp_number:document.getElementById('set-wa').value,
+      monthly_statement_day:document.getElementById('set-stmt-day').value,
+      coupon_reminder_days_before:document.getElementById('set-reminder').value,
+      working_days:document.getElementById('set-working').value,
+    };
+    await post('bond_app.api.save_settings',params);
+    showToast('Settings saved successfully!','success');
+  }catch(e){showToast('Error saving settings','error');}
+}
+
+// ── BADGE HELPERS ──
+function renderBondTypeBadge(type){
+  if(!type)return '—';
+  if(type==='Government Bond')return '<span class="badge badge-blue">Government</span>';
+  if(type==='Corporate Bond')return '<span class="badge badge-muted">Corporate</span>';
+  if(type==='Zero Coupon')return '<span class="badge badge-amber">Zero Coupon</span>';
+  return '<span class="badge badge-muted">'+type+'</span>';
+}
+function renderStatusBadge(status){
+  if(!status)return '—';
+  const map={Active:'badge-green',Upcoming:'badge-blue',Paid:'badge-green',Overdue:'badge-red',Defaulted:'badge-red',Matured:'badge-muted',Sold:'badge-muted',Settled:'badge-green',Pending:'badge-amber',Failed:'badge-red','Partially Settled':'badge-amber',Conservative:'badge-blue',Moderate:'badge-mint',Aggressive:'badge-red',Compliant:'badge-green','Non-Compliant':'badge-red','Pending Review':'badge-amber'};
+  return `<span class="badge ${map[status]||'badge-muted'}">${status}</span>`;
+}
+
+// ── INIT ──
+loadDashboard();
+</script>
+</body>
+</html>

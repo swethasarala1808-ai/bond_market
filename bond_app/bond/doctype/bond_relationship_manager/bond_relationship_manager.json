@@ -1,0 +1,71 @@
+{
+ "name": "Bond Relationship Manager",
+ "creation": "2024-01-01 00:00:00",
+ "modified": "2024-01-01 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "doctype": "DocType",
+ "module": "Bond",
+ "label": "Bond Relationship Manager",
+ "naming_rule": "field:rm_name",
+ "autoname": "field:rm_name",
+ "fields": [
+  {
+   "fieldname": "rm_name",
+   "fieldtype": "Data",
+   "label": "RM Name",
+   "reqd": 1,
+   "bold": 1
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email"
+  },
+  {
+   "fieldname": "phone",
+   "fieldtype": "Data",
+   "label": "Phone"
+  },
+  {
+   "fieldname": "_col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "employee_id",
+   "fieldtype": "Data",
+   "label": "Employee ID"
+  },
+  {
+   "fieldname": "clients_count",
+   "fieldtype": "Int",
+   "label": "Clients Count"
+  },
+  {
+   "fieldname": "aum_managed",
+   "fieldtype": "Currency",
+   "label": "AUM Managed"
+  },
+  {
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active",
+   "default": "1"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "All",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  }
+ ],
+ "is_submittable": 0,
+ "issingle": 0,
+ "track_changes": 1
+}

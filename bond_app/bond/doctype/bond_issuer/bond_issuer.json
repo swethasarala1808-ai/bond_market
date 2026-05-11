@@ -1,0 +1,158 @@
+{
+ "name": "Bond Issuer",
+ "creation": "2024-01-01 00:00:00",
+ "modified": "2024-01-01 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "doctype": "DocType",
+ "module": "Bond",
+ "label": "Bond Issuer",
+ "naming_rule": "field:issuer_name",
+ "autoname": "field:issuer_name",
+ "fields": [
+  {
+   "fieldname": "issuer_name",
+   "fieldtype": "Data",
+   "label": "Issuer Name",
+   "reqd": 1,
+   "bold": 1
+  },
+  {
+   "fieldname": "issuer_type",
+   "fieldtype": "Select",
+   "label": "Issuer Type",
+   "options": "Corporate\nGovernment\nMunicipal\nSupranational\nNBFC\nPSU\nFI"
+  },
+  {
+   "fieldname": "registered_country",
+   "fieldtype": "Data",
+   "label": "Registered Country"
+  },
+  {
+   "fieldname": "sector",
+   "fieldtype": "Select",
+   "label": "Sector",
+   "options": "Banking\nNBFC\nInfrastructure\nPower\nRoads\nTelecom\nIT\nPharma\nAuto\nReal Estate\nGovernment\nOther"
+  },
+  {
+   "fieldname": "_col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "credit_rating",
+   "fieldtype": "Data",
+   "label": "Credit Rating"
+  },
+  {
+   "fieldname": "rating_agency",
+   "fieldtype": "Data",
+   "label": "Rating Agency"
+  },
+  {
+   "fieldname": "sebi_registration",
+   "fieldtype": "Data",
+   "label": "SEBI Registration"
+  },
+  {
+   "fieldname": "cin_number",
+   "fieldtype": "Data",
+   "label": "CIN Number"
+  },
+  {
+   "fieldname": "pan_number",
+   "fieldtype": "Data",
+   "label": "PAN Number"
+  },
+  {
+   "fieldname": "gstin",
+   "fieldtype": "Data",
+   "label": "GSTIN"
+  },
+  {
+   "fieldname": "contact_section",
+   "fieldtype": "Section Break",
+   "label": "Contact"
+  },
+  {
+   "fieldname": "registered_address",
+   "fieldtype": "Small Text",
+   "label": "Registered Address"
+  },
+  {
+   "fieldname": "contact_name",
+   "fieldtype": "Data",
+   "label": "Contact Name"
+  },
+  {
+   "fieldname": "_col_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "contact_email",
+   "fieldtype": "Data",
+   "label": "Contact Email"
+  },
+  {
+   "fieldname": "contact_phone",
+   "fieldtype": "Data",
+   "label": "Contact Phone"
+  },
+  {
+   "fieldname": "portfolio_section",
+   "fieldtype": "Section Break",
+   "label": "Portfolio"
+  },
+  {
+   "fieldname": "total_bonds_issued",
+   "fieldtype": "Int",
+   "label": "Total Bonds Issued"
+  },
+  {
+   "fieldname": "total_outstanding",
+   "fieldtype": "Currency",
+   "label": "Total Outstanding"
+  },
+  {
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active",
+   "default": "1"
+  },
+  {
+   "fieldname": "esg_section",
+   "fieldtype": "Section Break",
+   "label": "ESG"
+  },
+  {
+   "fieldname": "esg_framework",
+   "fieldtype": "Select",
+   "label": "ESG Framework",
+   "options": "None\nICMA Green Bond Principles\nLMA Social Bond Principles\nSEBI Green Bond\nCBI Climate Bond"
+  },
+  {
+   "fieldname": "esg_verifier",
+   "fieldtype": "Data",
+   "label": "ESG Verifier"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "All",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  }
+ ],
+ "is_submittable": 0,
+ "issingle": 0,
+ "track_changes": 1
+}

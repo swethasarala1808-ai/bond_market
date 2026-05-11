@@ -1,0 +1,363 @@
+{
+ "name": "Bond Master",
+ "creation": "2024-01-01 00:00:00",
+ "modified": "2024-01-01 00:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "doctype": "DocType",
+ "module": "Bond",
+ "label": "Bond Master",
+ "naming_rule": "Expression",
+ "autoname": "BOND-.YYYY.-.#####",
+ "fields": [
+  {
+   "fieldname": "bond_name",
+   "fieldtype": "Data",
+   "label": "Bond Name",
+   "reqd": 1,
+   "bold": 1
+  },
+  {
+   "fieldname": "isin",
+   "fieldtype": "Data",
+   "label": "ISIN"
+  },
+  {
+   "fieldname": "cusip",
+   "fieldtype": "Data",
+   "label": "CUSIP"
+  },
+  {
+   "fieldname": "common_code",
+   "fieldtype": "Data",
+   "label": "Common Code"
+  },
+  {
+   "fieldname": "_col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "issuer_name",
+   "fieldtype": "Data",
+   "label": "Issuer Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "issuer_type",
+   "fieldtype": "Select",
+   "label": "Issuer Type",
+   "options": "Corporate\nCentral Government\nState Government\nMunicipal\nSupranational\nFinancial Institution\nNBFC\nPSU"
+  },
+  {
+   "fieldname": "issue_details_section",
+   "fieldtype": "Section Break",
+   "label": "Issue Details"
+  },
+  {
+   "fieldname": "issue_date",
+   "fieldtype": "Date",
+   "label": "Issue Date"
+  },
+  {
+   "fieldname": "maturity_date",
+   "fieldtype": "Date",
+   "label": "Maturity Date"
+  },
+  {
+   "fieldname": "tenor_years",
+   "fieldtype": "Float",
+   "label": "Tenor (Years)"
+  },
+  {
+   "fieldname": "tenor_description",
+   "fieldtype": "Select",
+   "label": "Tenor Description",
+   "options": "Short Term 1-5Y\nMedium Term 5-10Y\nLong Term 10Y+"
+  },
+  {
+   "fieldname": "_col_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "principal_amount",
+   "fieldtype": "Currency",
+   "label": "Principal Amount"
+  },
+  {
+   "fieldname": "issue_currency",
+   "fieldtype": "Select",
+   "label": "Issue Currency",
+   "options": "INR\nUSD\nEUR\nGBP\nJPY\nSGD\nAED"
+  },
+  {
+   "fieldname": "face_value",
+   "fieldtype": "Currency",
+   "label": "Face Value"
+  },
+  {
+   "fieldname": "total_issue_size",
+   "fieldtype": "Currency",
+   "label": "Total Issue Size"
+  },
+  {
+   "fieldname": "outstanding_amount",
+   "fieldtype": "Currency",
+   "label": "Outstanding Amount"
+  },
+  {
+   "fieldname": "coupon_details_section",
+   "fieldtype": "Section Break",
+   "label": "Coupon Details"
+  },
+  {
+   "fieldname": "coupon_type",
+   "fieldtype": "Select",
+   "label": "Coupon Type",
+   "options": "Fixed\nFloating\nZero Coupon\nIndex Linked\nInflation Linked\nStep-Up\nStep-Down\nInterest at Maturity\nVariable"
+  },
+  {
+   "fieldname": "coupon_rate",
+   "fieldtype": "Float",
+   "label": "Coupon Rate (%)"
+  },
+  {
+   "fieldname": "benchmark_rate",
+   "fieldtype": "Select",
+   "label": "Benchmark Rate",
+   "options": "SOFR\nLIBOR\nEURIBOR\nNIBOR\nMIBOR\nT-Bill\nNA"
+  },
+  {
+   "fieldname": "spread_bps",
+   "fieldtype": "Float",
+   "label": "Spread (bps)"
+  },
+  {
+   "fieldname": "_col_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "coupon_frequency",
+   "fieldtype": "Select",
+   "label": "Coupon Frequency",
+   "options": "Annual\nSemi-Annual\nQuarterly\nMonthly\nAt Maturity\nZero"
+  },
+  {
+   "fieldname": "first_coupon_date",
+   "fieldtype": "Date",
+   "label": "First Coupon Date"
+  },
+  {
+   "fieldname": "penultimate_date",
+   "fieldtype": "Date",
+   "label": "Penultimate Date"
+  },
+  {
+   "fieldname": "day_count_convention",
+   "fieldtype": "Select",
+   "label": "Day Count Convention",
+   "options": "Actual/Actual\nActual/360\nActual/365\n30/360\n30/365"
+  },
+  {
+   "fieldname": "business_day_convention",
+   "fieldtype": "Select",
+   "label": "Business Day Convention",
+   "options": "Following\nModified Following\nPreceding"
+  },
+  {
+   "fieldname": "payment_location",
+   "fieldtype": "Data",
+   "label": "Payment Location"
+  },
+  {
+   "fieldname": "legal_&_listing_section",
+   "fieldtype": "Section Break",
+   "label": "Legal & Listing"
+  },
+  {
+   "fieldname": "governing_law",
+   "fieldtype": "Select",
+   "label": "Governing Law",
+   "options": "Indian Law\nUK English Law\nNew York Law\nGerman Law\nFrench Law\nOther"
+  },
+  {
+   "fieldname": "exchange_listing",
+   "fieldtype": "Select",
+   "label": "Exchange Listing",
+   "options": "NSE\nBSE\nNSE+BSE\nLuxembourg\nDublin\nSingapore\nOTC\nUnlisted"
+  },
+  {
+   "fieldname": "_col_4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "credit_rating",
+   "fieldtype": "Data",
+   "label": "Credit Rating"
+  },
+  {
+   "fieldname": "credit_rating_agency",
+   "fieldtype": "Select",
+   "label": "Rating Agency",
+   "options": "CRISIL\nICRA\nCARE\nIndia Ratings\nS&P\nMoody's\nFitch"
+  },
+  {
+   "fieldname": "rating_outlook",
+   "fieldtype": "Select",
+   "label": "Rating Outlook",
+   "options": "Stable\nPositive\nNegative\nWatch"
+  },
+  {
+   "fieldname": "bond_classification_section",
+   "fieldtype": "Section Break",
+   "label": "Bond Classification"
+  },
+  {
+   "fieldname": "bond_type",
+   "fieldtype": "Select",
+   "label": "Bond Type",
+   "options": "Corporate Bond\nGovernment Bond\nZero Coupon\nConvertible\nExchangeable\nAmortizing\nInflation Indexed\nJunk/High Yield\nCallable\nPuttable\nPerpetual"
+  },
+  {
+   "fieldname": "security_type",
+   "fieldtype": "Select",
+   "label": "Security Type",
+   "options": "Secured\nUnsecured"
+  },
+  {
+   "fieldname": "domestic_foreign",
+   "fieldtype": "Select",
+   "label": "Market Type",
+   "options": "Domestic\nForeign\nEurobond\nGlobal\nInternational"
+  },
+  {
+   "fieldname": "_col_5",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "esg_classification",
+   "fieldtype": "Select",
+   "label": "ESG Classification",
+   "options": "None\nGreen Bond\nBlue Bond\nSocial Bond\nSustainability Bond\nGender Equality Bond\nClimate Bond\nPandemic Bond\nTransition Bond"
+  },
+  {
+   "fieldname": "use_of_proceeds",
+   "fieldtype": "Long Text",
+   "label": "Use of Proceeds"
+  },
+  {
+   "fieldname": "options_section",
+   "fieldtype": "Section Break",
+   "label": "Options"
+  },
+  {
+   "fieldname": "is_callable",
+   "fieldtype": "Check",
+   "label": "Is Callable"
+  },
+  {
+   "fieldname": "call_date",
+   "fieldtype": "Date",
+   "label": "Call Date"
+  },
+  {
+   "fieldname": "call_price",
+   "fieldtype": "Float",
+   "label": "Call Price"
+  },
+  {
+   "fieldname": "is_puttable",
+   "fieldtype": "Check",
+   "label": "Is Puttable"
+  },
+  {
+   "fieldname": "put_date",
+   "fieldtype": "Date",
+   "label": "Put Date"
+  },
+  {
+   "fieldname": "put_price",
+   "fieldtype": "Float",
+   "label": "Put Price"
+  },
+  {
+   "fieldname": "_col_6",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "is_convertible",
+   "fieldtype": "Check",
+   "label": "Is Convertible"
+  },
+  {
+   "fieldname": "conversion_ratio",
+   "fieldtype": "Float",
+   "label": "Conversion Ratio"
+  },
+  {
+   "fieldname": "conversion_price",
+   "fieldtype": "Float",
+   "label": "Conversion Price"
+  },
+  {
+   "fieldname": "conversion_shares",
+   "fieldtype": "Data",
+   "label": "Conversion Shares"
+  },
+  {
+   "fieldname": "is_exchangeable",
+   "fieldtype": "Check",
+   "label": "Is Exchangeable"
+  },
+  {
+   "fieldname": "exchange_company",
+   "fieldtype": "Data",
+   "label": "Exchange Company"
+  },
+  {
+   "fieldname": "is_amortizing",
+   "fieldtype": "Check",
+   "label": "Is Amortizing"
+  },
+  {
+   "fieldname": "other_section",
+   "fieldtype": "Section Break",
+   "label": "Other"
+  },
+  {
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active",
+   "default": "1"
+  },
+  {
+   "fieldname": "sebi_registration",
+   "fieldtype": "Data",
+   "label": "SEBI Registration"
+  },
+  {
+   "fieldname": "prospectus_url",
+   "fieldtype": "Data",
+   "label": "Prospectus URL"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "All",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 0,
+   "cancel": 0,
+   "amend": 0
+  }
+ ],
+ "is_submittable": 0,
+ "issingle": 0,
+ "track_changes": 1
+}
