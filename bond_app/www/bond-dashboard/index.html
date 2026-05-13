@@ -404,6 +404,15 @@ window.addEventListener('unhandledrejection',function(e){e.preventDefault();});
   <div class="modal" style="max-width:860px">
     <div class="modal-head"><h3>Add New Bond</h3><button class="modal-close" onclick="closeModal('add-bond-modal')">X</button></div>
     <div class="modal-body">
+      <div style="background:linear-gradient(135deg,#f0fffe,#f0f4ff);border:1px solid rgba(20,241,177,0.3);border-radius:12px;padding:1.25rem;margin-bottom:1.25rem">
+        <div style="font-weight:700;color:var(--navy);font-size:0.9rem;margin-bottom:0.5rem">🤖 Auto-fill from Prospectus</div>
+        <div style="font-size:0.82rem;color:var(--muted);margin-bottom:0.875rem">Upload a bond prospectus or term sheet — AI will automatically extract and fill all bond details below.</div>
+        <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+          <input type="file" id="bond-doc-upload" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="autoFillBondFromDoc(this)">
+          <button class="btn btn-grad" onclick="document.getElementById('bond-doc-upload').click()" id="auto-fill-btn">📄 Upload &amp; Auto-fill</button>
+          <span id="auto-fill-status" style="font-size:0.8rem;color:var(--muted)">Supported: PDF, Word, Text</span>
+        </div>
+      </div>
       <div class="form-grid">
         <div class="form-group"><label>Bond Name *</label><input type="text" id="ab-name"></div>
         <div class="form-group"><label>ISIN</label><input type="text" id="ab-isin" style="font-family:monospace"></div>
@@ -804,7 +813,7 @@ async function sendAiQuestion(){
   document.getElementById('ai-send-btn').disabled=true;
   var thinking=addAiMsg('bot','<span class="loading-dots">Analyzing bond documents</span>');
   try{
-    var r=await post('bond_app.api.ask_bond_ai',{bond_name:aiSelectedBond,question:question,session_id:aiSessionId});
+    var r=await post('bond_app.api.ask_bond_ai_v2',{bond_name:aiSelectedBond,question:question,session_id:aiSessionId});
     thinking.remove();
     if(r){
       if(r.session_id)aiSessionId=r.session_id;
@@ -840,6 +849,114 @@ async function saveSettings(){
   var p={company_name:document.getElementById('set-company').value,tagline:document.getElementById('set-tagline').value,sebi_registration:document.getElementById('set-sebi').value,phone:document.getElementById('set-phone').value,email:document.getElementById('set-email').value,address:document.getElementById('set-address').value,gstin:document.getElementById('set-gstin').value,upi_id:document.getElementById('set-upi').value,claude_api_key:document.getElementById('set-apikey').value,ai_model:document.getElementById('set-model').value,max_tokens_per_query:document.getElementById('set-tokens').value,whatsapp_number:document.getElementById('set-wa').value,monthly_statement_day:document.getElementById('set-stmt-day').value,coupon_reminder_days_before:document.getElementById('set-reminder').value};
   await post('bond_app.api.save_settings',p);
   showToast('Settings saved!','success');
+}
+
+
+// ── AUTO-FILL BOND FROM DOCUMENT ─────────────────────────────────────────────
+async function autoFillBondFromDoc(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var btn = document.getElementById('auto-fill-btn');
+  var status = document.getElementById('auto-fill-status');
+  btn.disabled = true;
+  btn.textContent = '⏳ Uploading...';
+  status.textContent = 'Uploading document...';
+  status.style.color = '#d97706';
+
+  try {
+    // Step 1: Upload file to Frappe
+    var fd = new FormData();
+    fd.append('file', file);
+    fd.append('is_private', '0');
+    fd.append('folder', 'Home');
+    var r = await fetch('/api/method/upload_file', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'X-Frappe-CSRF-Token': getCsrf()},
+      body: fd
+    });
+    var resp = await r.json();
+    var fileUrl = (resp.message && resp.message.file_url) || '';
+    if (!fileUrl) throw new Error('File upload failed');
+
+    btn.textContent = '🤖 AI Extracting...';
+    status.textContent = 'Claude AI is reading the document and extracting bond details...';
+
+    // Step 2: Call extract API
+    var result = await post('bond_app.api.extract_bond_from_document', {
+      file_url: fileUrl,
+      document_name: file.name
+    });
+
+    if (result && result.status === 'success' && result.bond_fields) {
+      var fields = result.bond_fields;
+
+      // Fill all form fields
+      var fieldMap = {
+        'ab-name': fields.bond_name,
+        'ab-isin': fields.isin,
+        'ab-issuer': fields.issuer_name,
+        'ab-issue-date': fields.issue_date,
+        'ab-maturity-date': fields.maturity_date,
+        'ab-principal': fields.principal_amount,
+        'ab-facevalue': fields.face_value,
+        'ab-coupon-rate': fields.coupon_rate,
+        'ab-rating': fields.credit_rating,
+        'ab-proceeds': fields.use_of_proceeds
+      };
+
+      Object.entries(fieldMap).forEach(function(e) {
+        var el = document.getElementById(e[0]);
+        if (el && e[1] !== null && e[1] !== undefined) {
+          el.value = e[1];
+          el.style.background = '#f0fffe';
+          el.style.borderColor = '#14F1B1';
+        }
+      });
+
+      // Fill select fields
+      var selectMap = {
+        'ab-bond-type': fields.bond_type,
+        'ab-currency': fields.issue_currency,
+        'ab-coupon-type': fields.coupon_type,
+        'ab-coupon-freq': fields.coupon_frequency,
+        'ab-esg': fields.esg_classification,
+        'ab-daycount': fields.day_count_convention,
+        'ab-rating-agency': fields.credit_rating_agency
+      };
+
+      Object.entries(selectMap).forEach(function(e) {
+        var el = document.getElementById(e[0]);
+        if (el && e[1]) {
+          for (var i = 0; i < el.options.length; i++) {
+            if (el.options[i].value === e[1] || el.options[i].text === e[1]) {
+              el.selectedIndex = i;
+              el.style.background = '#f0fffe';
+              el.style.borderColor = '#14F1B1';
+              break;
+            }
+          }
+        }
+      });
+
+      status.textContent = '✅ ' + result.message + ' — Please review and save.';
+      status.style.color = '#16a34a';
+      btn.textContent = '✅ Auto-filled!';
+      showToast('Bond details extracted! Please review and save.', 'success');
+    } else {
+      var errMsg = (result && result.message) || 'Extraction failed';
+      status.textContent = '⚠️ ' + errMsg;
+      status.style.color = '#dc2626';
+      btn.textContent = '📄 Upload & Auto-fill';
+      btn.disabled = false;
+    }
+  } catch (e) {
+    status.textContent = '❌ Error: ' + e.message;
+    status.style.color = '#dc2626';
+    btn.textContent = '📄 Upload & Auto-fill';
+    btn.disabled = false;
+  }
+  input.value = '';
 }
 
 // INIT

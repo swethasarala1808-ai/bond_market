@@ -758,3 +758,294 @@ def get_esg_reports():
     except Exception as e:
         frappe.log_error(str(e), "get_esg_reports")
         return []
+
+
+@frappe.whitelist(allow_guest=True)
+def ask_bond_ai_v2(bond_name, question, session_id=None):
+    """Improved ask_bond_ai with better error handling and api key check."""
+    try:
+        import requests
+        settings = _get_settings()
+        api_key = settings.claude_api_key or ""
+
+        # Clear API key check
+        if not api_key or len(api_key.strip()) < 20:
+            return {
+                "answer": "⚠️ Claude API Key not configured. Please go to **Settings** → enter your Claude API Key (starts with `sk-ant-...`) and click Save. Then come back here to ask questions.",
+                "sources": [],
+                "session_id": session_id or ""
+            }
+
+        # Get documents - try both bond_name and name filters
+        docs = frappe.get_all(
+            "Bond Document",
+            filters={"processing_status": "Ready"},
+            fields=["extracted_text", "key_terms_json", "document_summary", "document_name", "document_type", "bond_name"],
+            order_by="modified desc",
+            limit=10
+        )
+        # Filter by bond_name flexibly
+        bond_docs = [d for d in docs if d.get("bond_name") == bond_name or d.get("bond_name") in bond_name or bond_name in (d.get("bond_name") or "")]
+        if not bond_docs and docs:
+            bond_docs = docs[:3]  # fallback to latest docs
+
+        if not bond_docs:
+            return {
+                "answer": "📄 No processed documents found. Please upload the bond prospectus/document using the panel on the right, then click **Process with AI**. Once processed, I can answer any question about this bond.",
+                "sources": [],
+                "session_id": session_id or ""
+            }
+
+        # Build context
+        context_parts = []
+        for doc in bond_docs[:3]:
+            text = doc.get("extracted_text") or doc.get("document_summary") or ""
+            if text:
+                context_parts.append(f"[{doc.get('document_type','Document')} — {doc.get('document_name','Unknown')}]\n{text[:18000]}")
+        context = "\n\n---\n\n".join(context_parts)
+
+        # Get bond metadata
+        bond_list = frappe.get_all(
+            "Bond Master",
+            filters=[["name", "like", f"%{bond_name}%"]],
+            fields=["bond_name", "isin", "issuer_name", "coupon_rate", "coupon_type",
+                    "coupon_frequency", "maturity_date", "issue_date", "principal_amount",
+                    "issue_currency", "credit_rating", "esg_classification", "bond_type",
+                    "day_count_convention", "face_value", "governing_law"],
+            limit=1
+        )
+        if not bond_list:
+            bond_list = frappe.get_all("Bond Master", fields=["bond_name", "isin", "issuer_name"], limit=1)
+        bond_meta = json.dumps(bond_list[0] if bond_list else {}, default=str)
+
+        system_prompt = f"""You are an expert Bond Analyst AI for Bizaxl Securities with deep knowledge of:
+- Fixed income markets, bond pricing, yield calculations
+- Coupon structures (fixed, floating, step-up, zero coupon)
+- Day count conventions (Actual/Actual, 30/360, Actual/365)
+- ESG bond frameworks (Green, Social, Sustainability, Climate)
+- SEBI regulations and Indian bond markets
+- Bond documentation (prospectus, information memorandum, term sheets)
+
+You are analyzing a SPECIFIC BOND. Answer ONLY from the provided documents.
+Be precise, professional, and show calculations when asked.
+
+Bond Details: {bond_meta}
+
+Document Context:
+{context}
+
+Rules:
+- Show formulas for all calculations
+- Cite document sections when possible
+- If data not in documents, say so clearly
+- For coupon calculations, use the bond's day count convention"""
+
+        resp = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": api_key.strip(),
+                "anthropic-version": "2023-06-01"
+            },
+            json={
+                "model": settings.ai_model or "claude-sonnet-4-20250514",
+                "max_tokens": int(settings.max_tokens_per_query or 2000),
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": question}]
+            },
+            timeout=90
+        )
+
+        data = resp.json()
+
+        # Handle API errors explicitly
+        if resp.status_code != 200:
+            err_type = data.get("error", {}).get("type", "unknown")
+            err_msg = data.get("error", {}).get("message", "Unknown error")
+            if err_type == "authentication_error":
+                return {"answer": f"❌ Invalid Claude API Key. Please check your API key in Settings. It should start with `sk-ant-api03-...`\n\nError: {err_msg}", "sources": [], "session_id": session_id or ""}
+            return {"answer": f"❌ Claude API Error ({resp.status_code}): {err_msg}", "sources": [], "session_id": session_id or ""}
+
+        content_blocks = data.get("content", [])
+        answer = ""
+        for block in content_blocks:
+            if block.get("type") == "text":
+                answer += block.get("text", "")
+
+        if not answer:
+            answer = "I received an empty response. Please try again."
+
+        tokens = data.get("usage", {}).get("output_tokens", 0)
+
+        if not session_id:
+            session_id = f"SESSION-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        try:
+            chat = frappe.get_doc({
+                "doctype": "Bond AI Chat",
+                "bond_name": bond_name,
+                "session_id": session_id,
+                "question": question,
+                "answer": answer,
+                "model_used": settings.ai_model or "claude-sonnet-4-20250514",
+                "tokens_used": tokens,
+                "asked_by": frappe.session.user,
+                "asked_on": datetime.datetime.now()
+            })
+            chat.insert(ignore_permissions=True)
+            frappe.db.commit()
+        except Exception:
+            pass
+
+        return {
+            "answer": answer,
+            "session_id": session_id,
+            "sources": [d.get("document_name", "") for d in bond_docs]
+        }
+
+    except Exception as e:
+        frappe.log_error(str(e), "ask_bond_ai_v2")
+        return {
+            "answer": f"❌ Error: {str(e)}\n\nPlease check:\n1. Claude API Key is set in Settings\n2. Internet connection is available\n3. The bond document has been processed",
+            "sources": [],
+            "session_id": session_id or ""
+        }
+
+
+@frappe.whitelist(allow_guest=True)
+def extract_bond_from_document(file_url=None, file_content=None, document_name=None):
+    """
+    Upload a bond document (prospectus/term sheet) and AI auto-extracts
+    all bond fields to pre-fill the Add Bond form.
+    Returns a dict with all bond fields ready to populate the form.
+    """
+    try:
+        import requests
+        settings = _get_settings()
+        api_key = settings.claude_api_key or ""
+
+        if not api_key or len(api_key.strip()) < 20:
+            return {
+                "status": "error",
+                "message": "Claude API Key not configured. Please set it in Settings first."
+            }
+
+        # Read file content
+        extracted_text = ""
+        if file_url:
+            try:
+                file_docs = frappe.get_all("File", filters={"file_url": file_url}, fields=["name", "file_url"])
+                if file_docs:
+                    file_path = frappe.get_site_path() + file_url
+                    with open(file_path, 'rb') as f:
+                        content = f.read()
+                    try:
+                        extracted_text = content.decode('utf-8', errors='ignore')
+                    except Exception:
+                        extracted_text = str(content)
+            except Exception as fe:
+                extracted_text = f"Could not read file: {str(fe)}"
+
+        if not extracted_text:
+            return {"status": "error", "message": "Could not read the uploaded file. Please try a text-based PDF or .txt file."}
+
+        # Build extraction prompt
+        prompt = f"""You are a bond document parser. Extract ALL bond details from this document.
+
+Document: {document_name or 'Bond Document'}
+
+Content:
+{extracted_text[:45000]}
+
+Extract and return ONLY a valid JSON object with these exact keys (use null if not found):
+{{
+  "bond_name": "Full bond name",
+  "isin": "12-character ISIN code",
+  "cusip": "CUSIP if available",
+  "issuer_name": "Name of the bond issuer",
+  "issuer_type": "Corporate|Central Government|State Government|Municipal|Financial Institution|NBFC|PSU",
+  "issue_date": "YYYY-MM-DD",
+  "maturity_date": "YYYY-MM-DD",
+  "tenor_years": 10,
+  "principal_amount": 1000000,
+  "face_value": 1000,
+  "issue_currency": "INR|USD|EUR|GBP",
+  "total_issue_size": 5000000000,
+  "coupon_type": "Fixed|Floating|Zero Coupon|Step-Up|Step-Down|Variable|Index Linked",
+  "coupon_rate": 8.5,
+  "benchmark_rate": "SOFR|LIBOR|EURIBOR|MIBOR|NA",
+  "spread_bps": 0,
+  "coupon_frequency": "Annual|Semi-Annual|Quarterly|Monthly|At Maturity|Zero",
+  "first_coupon_date": "YYYY-MM-DD",
+  "day_count_convention": "Actual/Actual|Actual/360|Actual/365|30/360|30/365",
+  "business_day_convention": "Following|Modified Following|Preceding",
+  "governing_law": "Indian Law|UK English Law|New York Law|German Law|French Law|Other",
+  "exchange_listing": "NSE|BSE|NSE+BSE|Luxembourg|Dublin|Singapore|OTC|Unlisted",
+  "credit_rating": "AAA|AA+|AA|AA-|A+|A|BBB+|BBB|BB+|BB|B|sovereign",
+  "credit_rating_agency": "CRISIL|ICRA|CARE|India Ratings|S&P|Moody's|Fitch",
+  "rating_outlook": "Stable|Positive|Negative|Watch",
+  "bond_type": "Corporate Bond|Government Bond|Zero Coupon|Convertible|Exchangeable|Amortizing|Inflation Indexed|Junk/High Yield|Callable|Puttable|Perpetual",
+  "security_type": "Secured|Unsecured",
+  "domestic_foreign": "Domestic|Foreign|Eurobond|Global|International",
+  "esg_classification": "None|Green Bond|Blue Bond|Social Bond|Sustainability Bond|Gender Equality Bond|Climate Bond|Pandemic Bond|Transition Bond",
+  "use_of_proceeds": "Description of use of proceeds",
+  "is_callable": 0,
+  "call_date": "YYYY-MM-DD or null",
+  "call_price": null,
+  "is_puttable": 0,
+  "put_date": null,
+  "put_price": null,
+  "is_convertible": 0,
+  "is_amortizing": 0,
+  "sebi_registration": "SEBI reg number if any",
+  "payment_location": "Mumbai|London|New York",
+  "remarks": "Any important notes about this bond"
+}}
+
+Return ONLY the JSON, no other text."""
+
+        resp = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": api_key.strip(),
+                "anthropic-version": "2023-06-01"
+            },
+            json={
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 3000,
+                "messages": [{"role": "user", "content": prompt}]
+            },
+            timeout=120
+        )
+
+        if resp.status_code != 200:
+            err = resp.json().get("error", {}).get("message", "API error")
+            return {"status": "error", "message": f"Claude API error: {err}"}
+
+        data = resp.json()
+        ai_text = ""
+        for block in data.get("content", []):
+            if block.get("type") == "text":
+                ai_text += block.get("text", "")
+
+        # Parse JSON from response
+        try:
+            clean = ai_text.strip()
+            if "```json" in clean:
+                clean = clean.split("```json")[1].split("```")[0].strip()
+            elif "```" in clean:
+                clean = clean.split("```")[1].split("```")[0].strip()
+            bond_fields = json.loads(clean)
+        except Exception as pe:
+            return {"status": "error", "message": f"Could not parse AI response: {str(pe)}", "raw": ai_text[:500]}
+
+        return {
+            "status": "success",
+            "bond_fields": bond_fields,
+            "message": f"Successfully extracted bond details from {document_name or 'document'}"
+        }
+
+    except Exception as e:
+        frappe.log_error(str(e), "extract_bond_from_document")
+        return {"status": "error", "message": str(e)}
