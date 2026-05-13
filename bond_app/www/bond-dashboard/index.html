@@ -802,6 +802,89 @@ function addAiMsg(role,content){
   return div;
 }
 function askQuick(q){document.getElementById('ai-input').value=q;sendAiQuestion();}
+
+// Build system prompt from bond data and uploaded documents
+async function buildBondContext(bondName) {
+  var context = {systemPrompt:'', sources:[], bondMeta:{}};
+  try {
+    // Get bond metadata
+    var bondDetail = await post('bond_app.api.get_bond_detail', {bond_name: bondName});
+    if (bondDetail) {
+      context.bondMeta = bondDetail;
+    }
+    // Get coupon schedule
+    var cs = await post('bond_app.api.get_coupon_schedule', {bond_name: bondName}) || [];
+    // Get documents
+    var docs = await post('bond_app.api.get_bond_documents', {bond_name: bondName}) || [];
+    var readyDocs = docs.filter(function(d){return d.processing_status==='Ready';});
+
+    var bondInfo = '';
+    if (bondDetail) {
+      bondInfo = 'BOND DETAILS:\n' +
+        'Name: ' + (bondDetail.bond_name||'') + '\n' +
+        'ISIN: ' + (bondDetail.isin||'N/A') + '\n' +
+        'Issuer: ' + (bondDetail.issuer_name||'N/A') + '\n' +
+        'Bond Type: ' + (bondDetail.bond_type||'N/A') + '\n' +
+        'Coupon Type: ' + (bondDetail.coupon_type||'N/A') + '\n' +
+        'Coupon Rate: ' + (bondDetail.coupon_rate||0) + '% p.a.\n' +
+        'Coupon Frequency: ' + (bondDetail.coupon_frequency||'N/A') + '\n' +
+        'Issue Date: ' + (bondDetail.issue_date||'N/A') + '\n' +
+        'Maturity Date: ' + (bondDetail.maturity_date||'N/A') + '\n' +
+        'Face Value: ' + (bondDetail.face_value||'N/A') + '\n' +
+        'Principal Amount: ' + (bondDetail.principal_amount||'N/A') + '\n' +
+        'Total Issue Size: ' + (bondDetail.total_issue_size||'N/A') + '\n' +
+        'Currency: ' + (bondDetail.issue_currency||'INR') + '\n' +
+        'Credit Rating: ' + (bondDetail.credit_rating||'N/A') + ' (' + (bondDetail.credit_rating_agency||'N/A') + ')\n' +
+        'Rating Outlook: ' + (bondDetail.rating_outlook||'N/A') + '\n' +
+        'Day Count Convention: ' + (bondDetail.day_count_convention||'N/A') + '\n' +
+        'Business Day Convention: ' + (bondDetail.business_day_convention||'N/A') + '\n' +
+        'Exchange Listing: ' + (bondDetail.exchange_listing||'N/A') + '\n' +
+        'Governing Law: ' + (bondDetail.governing_law||'N/A') + '\n' +
+        'Security Type: ' + (bondDetail.security_type||'N/A') + '\n' +
+        'ESG Classification: ' + (bondDetail.esg_classification||'None') + '\n' +
+        'Is Callable: ' + (bondDetail.is_callable?'Yes':'No') + '\n' +
+        'Is Puttable: ' + (bondDetail.is_puttable?'Yes':'No') + '\n' +
+        'Is Convertible: ' + (bondDetail.is_convertible?'Yes':'No') + '\n' +
+        'Is Amortizing: ' + (bondDetail.is_amortizing?'Yes':'No') + '\n' +
+        (bondDetail.use_of_proceeds?'Use of Proceeds: '+bondDetail.use_of_proceeds+'\n':'') +
+        (bondDetail.remarks?'Remarks: '+bondDetail.remarks+'\n':'');
+    }
+
+    var couponInfo = '';
+    if (cs && cs.length) {
+      couponInfo = '\nCOUPON SCHEDULE:\n';
+      cs.slice(0, 20).forEach(function(c, i) {
+        couponInfo += (i+1) + '. Coupon Date: ' + c.coupon_date +
+          ' | Rate: ' + (c.coupon_rate_applicable||0) + '%' +
+          ' | Amount/Unit: ' + (c.coupon_amount_per_unit||0) +
+          ' | Total: ' + (c.total_coupon_amount||0) +
+          ' | Status: ' + (c.status||'Upcoming') + '\n';
+      });
+    }
+
+    var docContext = '';
+    readyDocs.forEach(function(d) {
+      context.sources.push(d.document_name);
+      if (d.document_summary) {
+        docContext += '\n[DOCUMENT: ' + d.document_name + ' (' + d.document_type + ')]\n' + d.document_summary + '\n';
+      }
+    });
+
+    context.systemPrompt = 'You are an expert Bond Analyst AI for Bizaxl Securities.' +
+      ' You have deep expertise in fixed income markets, bond pricing, yield calculations,' +
+      ' coupon structures, ESG bond frameworks, SEBI regulations, and Indian bond markets.' +
+      ' Answer questions about this specific bond using the data provided.' +
+      ' For calculations, always show the formula and step-by-step working.' +
+      ' Be professional, precise, and helpful.\n\n' +
+      bondInfo + couponInfo + docContext;
+
+  } catch(e) {
+    context.systemPrompt = 'You are an expert Bond Analyst AI for Bizaxl Securities.' +
+      ' Answer bond-related questions professionally with calculations and formulas.';
+  }
+  return context;
+}
+
 async function sendAiQuestion(){
   var input=document.getElementById('ai-input');
   var question=input.value.trim();
@@ -811,17 +894,55 @@ async function sendAiQuestion(){
   addAiMsg('user',question);
   document.getElementById('ai-status').innerHTML='Thinking<span class="loading-dots"></span>';
   document.getElementById('ai-send-btn').disabled=true;
-  var thinking=addAiMsg('bot','<span class="loading-dots">Analyzing bond documents</span>');
+  var thinking=addAiMsg('bot','<span class="loading-dots">Analyzing bond data</span>');
   try{
-    var r=await post('bond_app.api.ask_bond_ai_v2',{bond_name:aiSelectedBond,question:question,session_id:aiSessionId});
+    // Build context from bond data + documents
+    var ctx = await buildBondContext(aiSelectedBond);
+
+    // Call Anthropic API directly from browser (no user API key needed)
+    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        system: ctx.systemPrompt,
+        messages: [{role:'user', content: question}]
+      })
+    });
+
+    var data = await resp.json();
     thinking.remove();
-    if(r){
-      if(r.session_id)aiSessionId=r.session_id;
-      var answer=r.answer||'No answer received';
-      var src=r.sources&&r.sources.length?'<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:0.7rem;color:var(--muted)">\uD83D\uDCDA Sources: '+r.sources.join(', ')+'</div>':'';
-      addAiMsg('bot',answer.replace(/\n/g,'<br>')+src);
-    }else{addAiMsg('bot','Error: No response. Check Claude API key in Settings.');}
-  }catch(e){thinking.remove();addAiMsg('bot','Error: '+e.message);}
+
+    if (resp.ok && data.content && data.content.length > 0) {
+      var answer = data.content.map(function(b){return b.text||'';}).join('');
+      var src = ctx.sources.length ?
+        '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:0.7rem;color:var(--muted)">📚 Sources: '+ctx.sources.join(', ')+'</div>' : '';
+      addAiMsg('bot', answer.replace(/\n/g,'<br>') + src);
+
+      // Save to chat history via backend
+      try {
+        if (!aiSessionId) aiSessionId = 'SESSION-' + Date.now();
+        await post('bond_app.api.save_ai_chat', {
+          bond_name: aiSelectedBond,
+          session_id: aiSessionId,
+          question: question,
+          answer: answer
+        });
+      } catch(e2) {}
+
+    } else {
+      var errMsg = (data.error && data.error.message) || 'Unexpected error';
+      addAiMsg('bot', '❌ ' + errMsg);
+    }
+  }catch(e){
+    thinking.remove();
+    addAiMsg('bot','❌ Error: '+e.message+'. Please check your internet connection.');
+  }
   document.getElementById('ai-status').textContent='Ready';
   document.getElementById('ai-send-btn').disabled=false;
 }
@@ -883,10 +1004,71 @@ async function autoFillBondFromDoc(input) {
     status.textContent = 'Claude AI is reading the document and extracting bond details...';
 
     // Step 2: Call extract API
-    var result = await post('bond_app.api.extract_bond_from_document', {
-      file_url: fileUrl,
-      document_name: file.name
+    // Call Anthropic API directly from browser to extract bond details
+    btn.textContent = '🤖 AI Extracting...';
+    status.textContent = 'Claude AI is reading and extracting bond details...';
+
+    // Read file as text
+    var fileText = await new Promise(function(resolve) {
+      var reader = new FileReader();
+      reader.onload = function(e) { resolve(e.target.result); };
+      reader.onerror = function() { resolve(''); };
+      reader.readAsText(file);
     });
+
+    var prompt = 'You are a bond document parser. Extract ALL bond details from this document.\n\n' +
+      'Document: ' + file.name + '\n\n' +
+      'Content (first 40000 chars):\n' + (fileText || 'File URL: ' + fileUrl).substring(0, 40000) + '\n\n' +
+      'Extract and return ONLY a valid JSON object with these exact keys (use null if not found):\n' +
+      '{\n' +
+      '  "bond_name": "Full official bond name",\n' +
+      '  "isin": "12-char ISIN",\n' +
+      '  "issuer_name": "Issuer company/govt name",\n' +
+      '  "issue_date": "YYYY-MM-DD",\n' +
+      '  "maturity_date": "YYYY-MM-DD",\n' +
+      '  "principal_amount": 1000000,\n' +
+      '  "face_value": 1000,\n' +
+      '  "issue_currency": "INR",\n' +
+      '  "total_issue_size": 5000000000,\n' +
+      '  "coupon_type": "Fixed",\n' +
+      '  "coupon_rate": 8.5,\n' +
+      '  "coupon_frequency": "Semi-Annual",\n' +
+      '  "credit_rating": "AAA",\n' +
+      '  "credit_rating_agency": "CRISIL",\n' +
+      '  "bond_type": "Corporate Bond",\n' +
+      '  "esg_classification": "None",\n' +
+      '  "day_count_convention": "Actual/Actual",\n' +
+      '  "use_of_proceeds": "Description"\n' +
+      '}\n\nReturn ONLY the JSON, no other text.';
+
+    var aiResp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [{role:'user', content: prompt}]
+      })
+    });
+
+    var aiData = await aiResp.json();
+    var aiText = '';
+    if (aiResp.ok && aiData.content) {
+      aiText = aiData.content.map(function(b){return b.text||'';}).join('');
+    } else {
+      throw new Error((aiData.error&&aiData.error.message)||'AI extraction failed');
+    }
+
+    // Parse JSON
+    var clean = aiText.trim();
+    if (clean.indexOf('```json') >= 0) clean = clean.split('```json')[1].split('```')[0].trim();
+    else if (clean.indexOf('```') >= 0) clean = clean.split('```')[1].split('```')[0].trim();
+
+    var result = {status: 'success', bond_fields: JSON.parse(clean), message: 'Successfully extracted from ' + file.name};
 
     if (result && result.status === 'success' && result.bond_fields) {
       var fields = result.bond_fields;

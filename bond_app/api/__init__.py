@@ -1049,3 +1049,25 @@ Return ONLY the JSON, no other text."""
     except Exception as e:
         frappe.log_error(str(e), "extract_bond_from_document")
         return {"status": "error", "message": str(e)}
+
+
+@frappe.whitelist(allow_guest=True)
+def save_ai_chat(bond_name, session_id, question, answer):
+    """Save AI chat history to Bond AI Chat doctype."""
+    try:
+        chat = frappe.get_doc({
+            "doctype": "Bond AI Chat",
+            "bond_name": bond_name,
+            "session_id": session_id,
+            "question": question,
+            "answer": answer,
+            "model_used": "claude-sonnet-4-20250514",
+            "asked_by": frappe.session.user,
+            "asked_on": datetime.datetime.now()
+        })
+        chat.insert(ignore_permissions=True)
+        frappe.db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        frappe.log_error(str(e), "save_ai_chat")
+        return {"status": "error"}
