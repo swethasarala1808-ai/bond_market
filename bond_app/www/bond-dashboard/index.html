@@ -380,13 +380,15 @@ window.addEventListener('unhandledrejection',function(e){e.preventDefault();});
           </div>
         </div>
         <div class="settings-card">
-          <h4>AI &amp; Notifications</h4>
+          <h4>Notifications &amp; Alerts</h4>
           <div style="display:flex;flex-direction:column;gap:0.75rem">
-            <div class="form-group"><label>Claude API Key *</label><input type="password" id="set-apikey" placeholder="sk-ant-..."></div>
-            <div class="form-group"><label>AI Model</label><input type="text" id="set-model" placeholder="claude-sonnet-4-20250514"></div>
-            <div class="form-group"><label>Max Tokens Per Query</label><input type="number" id="set-tokens"></div>
+            <div style="background:#f0fffe;border:1px solid rgba(20,241,177,0.3);border-radius:10px;padding:1rem;margin-bottom:0.5rem">
+              <div style="font-weight:600;color:var(--navy);margin-bottom:4px">🤖 AI Bond Assistant</div>
+              <div style="font-size:0.82rem;color:var(--muted)">The AI is built-in and ready to use. No API key required. Select any bond and start asking questions.</div>
+            </div>
             <div class="form-group"><label>Monthly Statement Day</label><input type="number" id="set-stmt-day"></div>
             <div class="form-group"><label>Coupon Reminder Days Before</label><input type="number" id="set-reminder"></div>
+            <div class="form-group"><label>Working Days</label><input type="text" id="set-working" placeholder="Monday,Tuesday,Wednesday,Thursday,Friday"></div>
           </div>
           <button class="btn btn-grad" style="width:100%;margin-top:1.5rem" onclick="saveSettings()">Save Settings</button>
         </div>
@@ -803,88 +805,6 @@ function addAiMsg(role,content){
 }
 function askQuick(q){document.getElementById('ai-input').value=q;sendAiQuestion();}
 
-// Build system prompt from bond data and uploaded documents
-async function buildBondContext(bondName) {
-  var context = {systemPrompt:'', sources:[], bondMeta:{}};
-  try {
-    // Get bond metadata
-    var bondDetail = await post('bond_app.api.get_bond_detail', {bond_name: bondName});
-    if (bondDetail) {
-      context.bondMeta = bondDetail;
-    }
-    // Get coupon schedule
-    var cs = await post('bond_app.api.get_coupon_schedule', {bond_name: bondName}) || [];
-    // Get documents
-    var docs = await post('bond_app.api.get_bond_documents', {bond_name: bondName}) || [];
-    var readyDocs = docs.filter(function(d){return d.processing_status==='Ready';});
-
-    var bondInfo = '';
-    if (bondDetail) {
-      bondInfo = 'BOND DETAILS:\n' +
-        'Name: ' + (bondDetail.bond_name||'') + '\n' +
-        'ISIN: ' + (bondDetail.isin||'N/A') + '\n' +
-        'Issuer: ' + (bondDetail.issuer_name||'N/A') + '\n' +
-        'Bond Type: ' + (bondDetail.bond_type||'N/A') + '\n' +
-        'Coupon Type: ' + (bondDetail.coupon_type||'N/A') + '\n' +
-        'Coupon Rate: ' + (bondDetail.coupon_rate||0) + '% p.a.\n' +
-        'Coupon Frequency: ' + (bondDetail.coupon_frequency||'N/A') + '\n' +
-        'Issue Date: ' + (bondDetail.issue_date||'N/A') + '\n' +
-        'Maturity Date: ' + (bondDetail.maturity_date||'N/A') + '\n' +
-        'Face Value: ' + (bondDetail.face_value||'N/A') + '\n' +
-        'Principal Amount: ' + (bondDetail.principal_amount||'N/A') + '\n' +
-        'Total Issue Size: ' + (bondDetail.total_issue_size||'N/A') + '\n' +
-        'Currency: ' + (bondDetail.issue_currency||'INR') + '\n' +
-        'Credit Rating: ' + (bondDetail.credit_rating||'N/A') + ' (' + (bondDetail.credit_rating_agency||'N/A') + ')\n' +
-        'Rating Outlook: ' + (bondDetail.rating_outlook||'N/A') + '\n' +
-        'Day Count Convention: ' + (bondDetail.day_count_convention||'N/A') + '\n' +
-        'Business Day Convention: ' + (bondDetail.business_day_convention||'N/A') + '\n' +
-        'Exchange Listing: ' + (bondDetail.exchange_listing||'N/A') + '\n' +
-        'Governing Law: ' + (bondDetail.governing_law||'N/A') + '\n' +
-        'Security Type: ' + (bondDetail.security_type||'N/A') + '\n' +
-        'ESG Classification: ' + (bondDetail.esg_classification||'None') + '\n' +
-        'Is Callable: ' + (bondDetail.is_callable?'Yes':'No') + '\n' +
-        'Is Puttable: ' + (bondDetail.is_puttable?'Yes':'No') + '\n' +
-        'Is Convertible: ' + (bondDetail.is_convertible?'Yes':'No') + '\n' +
-        'Is Amortizing: ' + (bondDetail.is_amortizing?'Yes':'No') + '\n' +
-        (bondDetail.use_of_proceeds?'Use of Proceeds: '+bondDetail.use_of_proceeds+'\n':'') +
-        (bondDetail.remarks?'Remarks: '+bondDetail.remarks+'\n':'');
-    }
-
-    var couponInfo = '';
-    if (cs && cs.length) {
-      couponInfo = '\nCOUPON SCHEDULE:\n';
-      cs.slice(0, 20).forEach(function(c, i) {
-        couponInfo += (i+1) + '. Coupon Date: ' + c.coupon_date +
-          ' | Rate: ' + (c.coupon_rate_applicable||0) + '%' +
-          ' | Amount/Unit: ' + (c.coupon_amount_per_unit||0) +
-          ' | Total: ' + (c.total_coupon_amount||0) +
-          ' | Status: ' + (c.status||'Upcoming') + '\n';
-      });
-    }
-
-    var docContext = '';
-    readyDocs.forEach(function(d) {
-      context.sources.push(d.document_name);
-      if (d.document_summary) {
-        docContext += '\n[DOCUMENT: ' + d.document_name + ' (' + d.document_type + ')]\n' + d.document_summary + '\n';
-      }
-    });
-
-    context.systemPrompt = 'You are an expert Bond Analyst AI for Bizaxl Securities.' +
-      ' You have deep expertise in fixed income markets, bond pricing, yield calculations,' +
-      ' coupon structures, ESG bond frameworks, SEBI regulations, and Indian bond markets.' +
-      ' Answer questions about this specific bond using the data provided.' +
-      ' For calculations, always show the formula and step-by-step working.' +
-      ' Be professional, precise, and helpful.\n\n' +
-      bondInfo + couponInfo + docContext;
-
-  } catch(e) {
-    context.systemPrompt = 'You are an expert Bond Analyst AI for Bizaxl Securities.' +
-      ' Answer bond-related questions professionally with calculations and formulas.';
-  }
-  return context;
-}
-
 async function sendAiQuestion(){
   var input=document.getElementById('ai-input');
   var question=input.value.trim();
@@ -896,56 +816,28 @@ async function sendAiQuestion(){
   document.getElementById('ai-send-btn').disabled=true;
   var thinking=addAiMsg('bot','<span class="loading-dots">Analyzing bond data</span>');
   try{
-    // Build context from bond data + documents
-    var ctx = await buildBondContext(aiSelectedBond);
-
-    // Call Anthropic API directly from browser (no user API key needed)
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        system: ctx.systemPrompt,
-        messages: [{role:'user', content: question}]
-      })
+    var r=await post('bond_app.api.bond_ai_chat',{
+      bond_name:aiSelectedBond,
+      question:question,
+      session_id:aiSessionId||''
     });
-
-    var data = await resp.json();
     thinking.remove();
-
-    if (resp.ok && data.content && data.content.length > 0) {
-      var answer = data.content.map(function(b){return b.text||'';}).join('');
-      var src = ctx.sources.length ?
-        '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:0.7rem;color:var(--muted)">📚 Sources: '+ctx.sources.join(', ')+'</div>' : '';
-      addAiMsg('bot', answer.replace(/\n/g,'<br>') + src);
-
-      // Save to chat history via backend
-      try {
-        if (!aiSessionId) aiSessionId = 'SESSION-' + Date.now();
-        await post('bond_app.api.save_ai_chat', {
-          bond_name: aiSelectedBond,
-          session_id: aiSessionId,
-          question: question,
-          answer: answer
-        });
-      } catch(e2) {}
-
-    } else {
-      var errMsg = (data.error && data.error.message) || 'Unexpected error';
-      addAiMsg('bot', '❌ ' + errMsg);
+    if(r&&r.answer){
+      if(r.session_id)aiSessionId=r.session_id;
+      var src=r.sources&&r.sources.length?
+        '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:0.7rem;color:var(--muted)">Sources: '+r.sources.join(', ')+'</div>':'';
+      addAiMsg('bot',r.answer.replace(/\n/g,'<br>')+src);
+    }else{
+      addAiMsg('bot','No response received. Please try again.');
     }
   }catch(e){
     thinking.remove();
-    addAiMsg('bot','❌ Error: '+e.message+'. Please check your internet connection.');
+    addAiMsg('bot','Error: '+e.message);
   }
   document.getElementById('ai-status').textContent='Ready';
   document.getElementById('ai-send-btn').disabled=false;
 }
+
 function clearChat(){document.getElementById('ai-messages').innerHTML='<div class="empty-state"><div class="icon">\uD83E\uDD16</div><div>Chat cleared. Ask a new question.</div></div>';aiSessionId='';}
 
 // ── SETTINGS ──────────────────────────────────────────────────────────────────
@@ -959,18 +851,85 @@ async function loadSettings(){
   document.getElementById('set-address').value=s.address||'';
   document.getElementById('set-gstin').value=s.gstin||'';
   document.getElementById('set-upi').value=s.upi_id||'';
-  document.getElementById('set-apikey').value=s.claude_api_key||'';
-  document.getElementById('set-model').value=s.ai_model||'claude-sonnet-4-20250514';
-  document.getElementById('set-tokens').value=s.max_tokens_per_query||2000;
   document.getElementById('set-wa').value=s.whatsapp_number||'';
   document.getElementById('set-stmt-day').value=s.monthly_statement_day||1;
   document.getElementById('set-reminder').value=s.coupon_reminder_days_before||3;
+  var wd=document.getElementById('set-working');
+  if(wd)wd.value=s.working_days||'';
 }
 async function saveSettings(){
-  var p={company_name:document.getElementById('set-company').value,tagline:document.getElementById('set-tagline').value,sebi_registration:document.getElementById('set-sebi').value,phone:document.getElementById('set-phone').value,email:document.getElementById('set-email').value,address:document.getElementById('set-address').value,gstin:document.getElementById('set-gstin').value,upi_id:document.getElementById('set-upi').value,claude_api_key:document.getElementById('set-apikey').value,ai_model:document.getElementById('set-model').value,max_tokens_per_query:document.getElementById('set-tokens').value,whatsapp_number:document.getElementById('set-wa').value,monthly_statement_day:document.getElementById('set-stmt-day').value,coupon_reminder_days_before:document.getElementById('set-reminder').value};
+  var wd=document.getElementById('set-working');
+  var p={company_name:document.getElementById('set-company').value,tagline:document.getElementById('set-tagline').value,sebi_registration:document.getElementById('set-sebi').value,phone:document.getElementById('set-phone').value,email:document.getElementById('set-email').value,address:document.getElementById('set-address').value,gstin:document.getElementById('set-gstin').value,upi_id:document.getElementById('set-upi').value,whatsapp_number:document.getElementById('set-wa').value,monthly_statement_day:document.getElementById('set-stmt-day').value,coupon_reminder_days_before:document.getElementById('set-reminder').value,working_days:wd?wd.value:''};
   await post('bond_app.api.save_settings',p);
   showToast('Settings saved!','success');
 }
+
+
+// ── AUTO-FILL BOND FROM DOCUMENT ─────────────────────────────────────────────
+async function autoFillBondFromDoc(input) {
+  var file=input.files[0]; if(!file)return;
+  var btn=document.getElementById('auto-fill-btn');
+  var status=document.getElementById('auto-fill-status');
+  btn.disabled=true; btn.textContent='Uploading...';
+  status.textContent='Uploading document...';
+  status.style.color='#d97706';
+  try{
+    // Step 1: Upload file to Frappe
+    var fd=new FormData();
+    fd.append('file',file); fd.append('is_private','0'); fd.append('folder','Home');
+    var r=await fetch('/api/method/upload_file',{method:'POST',credentials:'same-origin',headers:{'X-Frappe-CSRF-Token':getCsrf()},body:fd});
+    var resp=await r.json();
+    var fileUrl=(resp.message&&resp.message.file_url)||'';
+    if(!fileUrl) throw new Error('File upload failed');
+
+    btn.textContent='AI Extracting...';
+    status.textContent='Built-in Bond AI is reading the document and extracting all details...';
+
+    // Step 2: Call built-in extraction — no user API key needed
+    var result=await post('bond_app.api.bond_ai_extract',{
+      file_url:fileUrl,
+      document_name:file.name
+    });
+
+    if(result&&result.status==='success'&&result.bond_fields){
+      var fields=result.bond_fields;
+      var textMap={'ab-name':fields.bond_name,'ab-isin':fields.isin,'ab-issuer':fields.issuer_name,
+        'ab-issue-date':fields.issue_date,'ab-maturity-date':fields.maturity_date,
+        'ab-principal':fields.principal_amount,'ab-facevalue':fields.face_value,
+        'ab-coupon-rate':fields.coupon_rate,'ab-rating':fields.credit_rating,
+        'ab-proceeds':fields.use_of_proceeds};
+      Object.entries(textMap).forEach(function(e){
+        var el=document.getElementById(e[0]);
+        if(el&&e[1]!==null&&e[1]!==undefined){el.value=e[1];el.style.background='#f0fffe';el.style.borderColor='#14F1B1';}
+      });
+      var selMap={'ab-bond-type':fields.bond_type,'ab-currency':fields.issue_currency,
+        'ab-coupon-type':fields.coupon_type,'ab-coupon-freq':fields.coupon_frequency,
+        'ab-esg':fields.esg_classification,'ab-daycount':fields.day_count_convention,
+        'ab-rating-agency':fields.credit_rating_agency};
+      Object.entries(selMap).forEach(function(e){
+        var el=document.getElementById(e[0]);
+        if(el&&e[1]){for(var i=0;i<el.options.length;i++){if(el.options[i].text===e[1]||el.options[i].value===e[1]){el.selectedIndex=i;el.style.borderColor='#14F1B1';break;}}}
+      });
+      status.textContent='All fields auto-filled! Please review and save.';
+      status.style.color='#16a34a';
+      btn.textContent='Auto-filled!';
+      showToast('Bond details extracted successfully!','success');
+    } else {
+      var errMsg=(result&&result.message)||'Extraction failed';
+      status.textContent='Failed: '+errMsg;
+      status.style.color='#dc2626';
+      btn.textContent='Upload & Auto-fill'; btn.disabled=false;
+    }
+  }catch(e){
+    status.textContent='Error: '+e.message;
+    status.style.color='#dc2626';
+    btn.textContent='Upload & Auto-fill'; btn.disabled=false;
+  }
+  input.value='';
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────────────────────
+
 
 
 // ── AUTO-FILL BOND FROM DOCUMENT ─────────────────────────────────────────────

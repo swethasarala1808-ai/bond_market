@@ -1071,3 +1071,356 @@ def save_ai_chat(bond_name, session_id, question, answer):
     except Exception as e:
         frappe.log_error(str(e), "save_ai_chat")
         return {"status": "error"}
+
+
+# ─── BUILT-IN BOND AI (NO USER API KEY NEEDED) ───────────────────────────────
+# This endpoint acts as a proxy — the app calls Anthropic on behalf of the user.
+# Users never need to configure any API key.
+
+def _call_claude(system_prompt, user_message, max_tokens=2000):
+    """Internal helper to call Claude API. App provides its own access."""
+    import requests as _req
+    import os
+
+    # Try multiple sources for the API key (app-level, not user-level)
+    api_key = (
+        os.environ.get("ANTHROPIC_API_KEY") or
+        os.environ.get("CLAUDE_API_KEY") or
+        frappe.conf.get("anthropic_api_key") or
+        ""
+    )
+
+    # If no env key, try the Settings (user may have put it there)
+    if not api_key:
+        try:
+            s = frappe.get_single("Bond Settings")
+            api_key = s.claude_api_key or ""
+        except Exception:
+            pass
+
+    if not api_key:
+        return {
+            "success": False,
+            "answer": "🔧 The Bond AI needs to be configured by the administrator.\n\nPlease ask your system admin to set the `ANTHROPIC_API_KEY` environment variable on the server, or enter it once in Bond Settings.",
+            "error": "no_key"
+        }
+
+    try:
+        resp = _req.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": api_key.strip(),
+                "anthropic-version": "2023-06-01"
+            },
+            json={
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": max_tokens,
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": user_message}]
+            },
+            timeout=90
+        )
+        data = resp.json()
+
+        if resp.status_code == 200:
+            text = ""
+            for block in data.get("content", []):
+                if block.get("type") == "text":
+                    text += block.get("text", "")
+            return {"success": True, "answer": text, "tokens": data.get("usage", {}).get("output_tokens", 0)}
+        else:
+            err = data.get("error", {}).get("message", f"HTTP {resp.status_code}")
+            return {"success": False, "answer": f"AI Error: {err}", "error": err}
+    except Exception as e:
+        return {"success": False, "answer": f"Connection error: {str(e)}", "error": str(e)}
+
+
+@frappe.whitelist(allow_guest=True)
+def bond_ai_chat(bond_name, question, session_id=None):
+    """
+    Built-in Bond AI — no user API key needed.
+    Loads bond data + documents from DB, calls Claude, returns answer.
+    """
+    try:
+        # ── Load bond data from DB ──────────────────────────────────────────
+        bond_info = ""
+        coupon_info = ""
+        doc_context = ""
+        sources = []
+
+        # Bond master details
+        bonds = frappe.get_all(
+            "Bond Master",
+            filters=[["name", "=", bond_name]],
+            fields=["*"],
+            limit=1
+        )
+        if bonds:
+            b = bonds[0]
+            bond_info = f"""BOND DETAILS:
+Name: {b.get('bond_name', '')}
+ISIN: {b.get('isin', 'N/A')}
+Issuer: {b.get('issuer_name', 'N/A')} ({b.get('issuer_type', '')})
+Bond Type: {b.get('bond_type', 'N/A')}
+Coupon Type: {b.get('coupon_type', 'N/A')}
+Coupon Rate: {b.get('coupon_rate', 0)}% p.a.
+Benchmark Rate: {b.get('benchmark_rate', 'NA')}
+Spread (bps): {b.get('spread_bps', 0)}
+Coupon Frequency: {b.get('coupon_frequency', 'N/A')}
+First Coupon Date: {b.get('first_coupon_date', 'N/A')}
+Penultimate Date: {b.get('penultimate_date', 'N/A')}
+Issue Date: {b.get('issue_date', 'N/A')}
+Maturity Date: {b.get('maturity_date', 'N/A')}
+Tenor: {b.get('tenor_years', 'N/A')} years
+Face Value: {b.get('face_value', 'N/A')}
+Principal Amount: {b.get('principal_amount', 'N/A')}
+Total Issue Size: {b.get('total_issue_size', 'N/A')}
+Outstanding Amount: {b.get('outstanding_amount', 'N/A')}
+Currency: {b.get('issue_currency', 'INR')}
+Credit Rating: {b.get('credit_rating', 'N/A')} ({b.get('credit_rating_agency', 'N/A')}) — {b.get('rating_outlook', 'N/A')}
+Day Count Convention: {b.get('day_count_convention', 'N/A')}
+Business Day Convention: {b.get('business_day_convention', 'N/A')}
+Exchange Listing: {b.get('exchange_listing', 'N/A')}
+Governing Law: {b.get('governing_law', 'N/A')}
+Security Type: {b.get('security_type', 'N/A')}
+Domestic/Foreign: {b.get('domestic_foreign', 'N/A')}
+ESG Classification: {b.get('esg_classification', 'None')}
+Use of Proceeds: {b.get('use_of_proceeds', 'N/A')}
+Is Callable: {'Yes — Call Date: ' + str(b.get('call_date','')) + ' Price: ' + str(b.get('call_price','')) if b.get('is_callable') else 'No'}
+Is Puttable: {'Yes — Put Date: ' + str(b.get('put_date','')) + ' Price: ' + str(b.get('put_price','')) if b.get('is_puttable') else 'No'}
+Is Convertible: {'Yes — Ratio: ' + str(b.get('conversion_ratio','')) + ' Price: ' + str(b.get('conversion_price','')) if b.get('is_convertible') else 'No'}
+Is Amortizing: {'Yes' if b.get('is_amortizing') else 'No'}
+Payment Location: {b.get('payment_location', 'N/A')}
+SEBI Registration: {b.get('sebi_registration', 'N/A')}
+Remarks: {b.get('remarks', '')}"""
+
+        # Coupon schedule
+        coupons = frappe.get_all(
+            "Bond Coupon Schedule",
+            filters={"bond_name": bond_name},
+            fields=["*"],
+            order_by="coupon_number asc",
+            limit=40
+        )
+        if coupons:
+            coupon_info = "\nCOUPON SCHEDULE:\n"
+            for c in coupons:
+                coupon_info += (
+                    f"{c.get('coupon_number','?')}. "
+                    f"Date: {c.get('coupon_date','?')} | "
+                    f"Rate: {c.get('coupon_rate_applicable',0)}% | "
+                    f"Amount/Unit: {c.get('coupon_amount_per_unit',0)} | "
+                    f"Total: {c.get('total_coupon_amount',0)} | "
+                    f"Days: {c.get('day_count_days','')} | "
+                    f"Status: {c.get('status','Upcoming')}\n"
+                )
+
+        # Amortization schedule
+        amort = frappe.get_all(
+            "Bond Amortization Schedule",
+            filters={"bond_name": bond_name},
+            fields=["*"],
+            order_by="payment_number asc",
+            limit=30
+        )
+        if amort:
+            coupon_info += "\nAMORTIZATION SCHEDULE:\n"
+            for a in amort:
+                coupon_info += (
+                    f"{a.get('payment_number','?')}. "
+                    f"Date: {a.get('payment_date','?')} | "
+                    f"Opening: {a.get('opening_principal',0)} | "
+                    f"Coupon: {a.get('coupon_payment',0)} | "
+                    f"Principal: {a.get('principal_payment',0)} | "
+                    f"Closing: {a.get('closing_principal',0)}\n"
+                )
+
+        # Step schedule (for step-up/step-down bonds)
+        steps = frappe.get_all(
+            "Bond Step Schedule",
+            filters={"bond_name": bond_name},
+            fields=["*"],
+            order_by="period_from asc"
+        )
+        if steps:
+            coupon_info += "\nSTEP SCHEDULE:\n"
+            for s in steps:
+                coupon_info += (
+                    f"Period: {s.get('period_from','')} to {s.get('period_to','')} | "
+                    f"Rate: {s.get('coupon_rate',0)}% | "
+                    f"Type: {s.get('rate_type','')} | "
+                    f"Benchmark: {s.get('benchmark','')} | "
+                    f"Spread: {s.get('spread_bps',0)}bps\n"
+                )
+
+        # Uploaded documents (processed)
+        docs = frappe.get_all(
+            "Bond Document",
+            filters={"bond_name": bond_name, "processing_status": "Ready"},
+            fields=["document_name", "document_type", "document_summary", "key_terms_json", "extracted_text"],
+            order_by="modified desc",
+            limit=3
+        )
+        for doc in docs:
+            sources.append(doc.get("document_name", ""))
+            text = doc.get("extracted_text") or doc.get("document_summary") or ""
+            if text:
+                doc_context += f"\n[{doc.get('document_type','Document')}: {doc.get('document_name','')}]\n{text[:12000]}\n"
+            if doc.get("key_terms_json"):
+                try:
+                    kt = json.loads(doc["key_terms_json"])
+                    doc_context += f"Key Terms: {json.dumps(kt, indent=2)[:2000]}\n"
+                except Exception:
+                    pass
+
+        # ── Build system prompt ─────────────────────────────────────────────
+        system_prompt = f"""You are the Bizaxl Bond AI — a built-in expert bond analyst for the Bizaxl Securities bond management platform.
+
+You have deep expertise in:
+- Fixed income markets and bond pricing
+- Coupon calculations (fixed, floating, step-up, zero coupon, amortizing)
+- Day count conventions (Actual/Actual, 30/360, Actual/365, Actual/360)
+- Yield to maturity, yield to call, duration, convexity
+- ESG bond frameworks (Green, Blue, Social, Sustainability, Climate)
+- SEBI regulations and Indian bond markets
+- Bond documentation (prospectus, IM, term sheets, covenants)
+
+You are answering questions about this SPECIFIC BOND. Use ONLY the data below.
+Show all formulas and step-by-step calculations when asked.
+Be professional, precise, and helpful.
+
+{bond_info}
+{coupon_info}
+{doc_context if doc_context else ''}"""
+
+        # ── Call Claude ─────────────────────────────────────────────────────
+        result = _call_claude(system_prompt, question, max_tokens=2000)
+
+        # ── Save to chat history ────────────────────────────────────────────
+        if not session_id:
+            session_id = f"SESSION-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        if result.get("success"):
+            try:
+                chat = frappe.get_doc({
+                    "doctype": "Bond AI Chat",
+                    "bond_name": bond_name,
+                    "session_id": session_id,
+                    "question": question,
+                    "answer": result["answer"],
+                    "model_used": "claude-sonnet-4-20250514",
+                    "tokens_used": result.get("tokens", 0),
+                    "asked_by": frappe.session.user,
+                    "asked_on": datetime.datetime.now(),
+                    "sources_cited": ", ".join(sources)
+                })
+                chat.insert(ignore_permissions=True)
+                frappe.db.commit()
+            except Exception:
+                pass
+
+        return {
+            "answer": result.get("answer", "Unable to process"),
+            "session_id": session_id,
+            "sources": sources,
+            "success": result.get("success", False)
+        }
+
+    except Exception as e:
+        frappe.log_error(str(e), "bond_ai_chat")
+        return {
+            "answer": f"Error: {str(e)}",
+            "session_id": session_id or "",
+            "sources": [],
+            "success": False
+        }
+
+
+@frappe.whitelist(allow_guest=True)
+def bond_ai_extract(file_url, document_name="Bond Document"):
+    """
+    Built-in document extraction — reads uploaded file and extracts all bond fields.
+    No user API key needed.
+    """
+    try:
+        extracted_text = ""
+        if file_url:
+            try:
+                file_path = frappe.get_site_path() + file_url
+                with open(file_path, 'rb') as f:
+                    content = f.read()
+                extracted_text = content.decode('utf-8', errors='ignore')
+            except Exception as fe:
+                return {"status": "error", "message": f"Cannot read file: {str(fe)}"}
+
+        if not extracted_text:
+            return {"status": "error", "message": "File is empty or unreadable. Please use a text-based PDF or .txt file."}
+
+        prompt = f"""Extract ALL bond details from this document. Return ONLY valid JSON.
+
+Document: {document_name}
+Content:
+{extracted_text[:45000]}
+
+Return this exact JSON structure (null for missing fields):
+{{
+  "bond_name": "Full official bond name",
+  "isin": "12-char ISIN code",
+  "issuer_name": "Issuer name",
+  "issuer_type": "Corporate|Central Government|State Government|Municipal|Financial Institution|NBFC|PSU",
+  "issue_date": "YYYY-MM-DD",
+  "maturity_date": "YYYY-MM-DD",
+  "tenor_years": 10,
+  "principal_amount": 1000000,
+  "face_value": 1000,
+  "issue_currency": "INR",
+  "total_issue_size": 5000000000,
+  "coupon_type": "Fixed|Floating|Zero Coupon|Step-Up|Step-Down|Variable",
+  "coupon_rate": 8.5,
+  "coupon_frequency": "Annual|Semi-Annual|Quarterly|Monthly|At Maturity",
+  "first_coupon_date": "YYYY-MM-DD",
+  "credit_rating": "AAA",
+  "credit_rating_agency": "CRISIL|ICRA|CARE|India Ratings|S&P|Moody's|Fitch",
+  "rating_outlook": "Stable|Positive|Negative|Watch",
+  "bond_type": "Corporate Bond|Government Bond|Zero Coupon|Convertible|Amortizing|Callable|Puttable",
+  "security_type": "Secured|Unsecured",
+  "esg_classification": "None|Green Bond|Blue Bond|Social Bond|Sustainability Bond|Climate Bond",
+  "day_count_convention": "Actual/Actual|Actual/360|Actual/365|30/360",
+  "governing_law": "Indian Law|UK English Law|New York Law",
+  "exchange_listing": "NSE|BSE|NSE+BSE|OTC|Unlisted",
+  "use_of_proceeds": "Description of use",
+  "is_callable": 0,
+  "call_date": null,
+  "call_price": null,
+  "is_puttable": 0,
+  "is_convertible": 0,
+  "is_amortizing": 0,
+  "sebi_registration": null,
+  "remarks": "Key notes"
+}}"""
+
+        result = _call_claude(
+            "You are a bond document parser. Extract bond data and return only valid JSON.",
+            prompt,
+            max_tokens=3000
+        )
+
+        if not result.get("success"):
+            return {"status": "error", "message": result.get("answer", "AI extraction failed")}
+
+        ai_text = result["answer"].strip()
+        if "```json" in ai_text:
+            ai_text = ai_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in ai_text:
+            ai_text = ai_text.split("```")[1].split("```")[0].strip()
+
+        try:
+            bond_fields = json.loads(ai_text)
+            return {"status": "success", "bond_fields": bond_fields, "message": f"Extracted from {document_name}"}
+        except Exception as pe:
+            return {"status": "error", "message": f"Could not parse response: {str(pe)}", "raw": ai_text[:300]}
+
+    except Exception as e:
+        frappe.log_error(str(e), "bond_ai_extract")
+        return {"status": "error", "message": str(e)}
