@@ -312,7 +312,7 @@ window.addEventListener('unhandledrejection',function(e){e.preventDefault();});
       <div class="ai-layout">
         <div class="ai-chat-panel">
           <div class="ai-chat-header">
-            <h3>AI Bond Assistant <span class="ai-badge">Claude AI</span></h3>
+            <h3>🤖 Bizaxl Bond AI <span class="ai-badge">Built-in</span></h3>
             <select class="ai-bond-select" id="ai-bond-select" onchange="onBondSelected()"><option value="">Select a Bond to Analyze</option></select>
           </div>
           <div class="ai-messages" id="ai-messages">
@@ -331,7 +331,7 @@ window.addEventListener('unhandledrejection',function(e){e.preventDefault();});
           <div class="ai-input-area">
             <div style="font-size:0.72rem;color:var(--muted);margin-bottom:8px" id="ai-status">Ready — select a bond and ask anything</div>
             <div class="ai-input-row">
-              <textarea class="ai-input" id="ai-input" placeholder="Ask anything about this bond..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiQuestion()}" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+              <textarea class="ai-input" id="ai-input" placeholder="Ask me anything — coupon schedule, risk factors, yield, covenants, ESG..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiQuestion()}" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
               <button class="ai-send" id="ai-send-btn" onclick="sendAiQuestion()">&#10148;</button>
             </div>
             <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px" onclick="clearChat()">Clear Chat</button>
@@ -383,8 +383,8 @@ window.addEventListener('unhandledrejection',function(e){e.preventDefault();});
           <h4>Notifications &amp; Alerts</h4>
           <div style="display:flex;flex-direction:column;gap:0.75rem">
             <div style="background:#f0fffe;border:1px solid rgba(20,241,177,0.3);border-radius:10px;padding:1rem;margin-bottom:0.5rem">
-              <div style="font-weight:600;color:var(--navy);margin-bottom:4px">🤖 AI Bond Assistant</div>
-              <div style="font-size:0.82rem;color:var(--muted)">The AI is built-in and ready to use. No API key required. Select any bond and start asking questions.</div>
+              <div style="font-weight:600;color:var(--navy);margin-bottom:4px">🤖 Bizaxl Bond AI — Built-in</div>
+              <div style="font-size:0.82rem;color:var(--muted)">100% built-in — no external API, no API key, no internet dependency. Runs entirely from your bond database.</div>
             </div>
             <div class="form-group"><label>Monthly Statement Day</label><input type="number" id="set-stmt-day"></div>
             <div class="form-group"><label>Coupon Reminder Days Before</label><input type="number" id="set-reminder"></div>
@@ -778,7 +778,7 @@ async function processDocument(){if(lastDocName)await processSpecificDoc(lastDoc
 async function processSpecificDoc(docName){
   var btn=document.getElementById('process-btn');
   btn.disabled=true;btn.textContent='\u23F3 Processing...';
-  document.getElementById('upload-status').textContent='Claude AI is reading the document...';
+  document.getElementById('upload-status').textContent='Bizaxl Bond AI is reading the document...';
   addAiMsg('bot','Reading document and extracting key information <span class="loading-dots"></span>');
   try{
     var r=await post('bond_app.api.process_bond_document',{bond_doc_name:docName});
@@ -790,7 +790,7 @@ async function processSpecificDoc(docName){
     }else{
       document.getElementById('upload-status').textContent='\u26A0\uFE0F Processing failed';
       btn.textContent='Retry';btn.disabled=false;
-      addAiMsg('bot','Processing failed. Please check your Claude API key in Settings, then retry.');
+      addAiMsg('bot','Processing failed. Please try again or check the document format.');
     }
   }catch(e){btn.textContent='Retry';btn.disabled=false;}
 }
@@ -816,7 +816,7 @@ async function sendAiQuestion(){
   document.getElementById('ai-send-btn').disabled=true;
   var thinking=addAiMsg('bot','<span class="loading-dots">Analyzing bond data</span>');
   try{
-    var r=await post('bond_app.api.bond_ai_chat',{
+    var r=await post('bond_app.api.bizaxl_bond_ai',{
       bond_name:aiSelectedBond,
       question:question,
       session_id:aiSessionId||''
@@ -886,7 +886,7 @@ async function autoFillBondFromDoc(input) {
     status.textContent='Built-in Bond AI is reading the document and extracting all details...';
 
     // Step 2: Call built-in extraction — no user API key needed
-    var result=await post('bond_app.api.bond_ai_extract',{
+    var result=await post('bond_app.api.bizaxl_bond_extract',{
       file_url:fileUrl,
       document_name:file.name
     });
@@ -960,12 +960,12 @@ async function autoFillBondFromDoc(input) {
     if (!fileUrl) throw new Error('File upload failed');
 
     btn.textContent = '🤖 AI Extracting...';
-    status.textContent = 'Claude AI is reading the document and extracting bond details...';
+    status.textContent = 'Bizaxl Bond AI is reading the document and extracting details...';
 
     // Step 2: Call extract API
-    // Call Anthropic API directly from browser to extract bond details
+    // Call Bizaxl built-in AI to extract bond details
     btn.textContent = '🤖 AI Extracting...';
-    status.textContent = 'Claude AI is reading and extracting bond details...';
+    status.textContent = 'Bizaxl Bond AI is reading and extracting bond details...';
 
     // Read file as text
     var fileText = await new Promise(function(resolve) {
@@ -1000,34 +1000,10 @@ async function autoFillBondFromDoc(input) {
       '  "use_of_proceeds": "Description"\n' +
       '}\n\nReturn ONLY the JSON, no other text.';
 
-    var aiResp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        messages: [{role:'user', content: prompt}]
-      })
+    var result = await post('bond_app.api.bizaxl_bond_extract', {
+      file_url: fileUrl,
+      document_name: file.name
     });
-
-    var aiData = await aiResp.json();
-    var aiText = '';
-    if (aiResp.ok && aiData.content) {
-      aiText = aiData.content.map(function(b){return b.text||'';}).join('');
-    } else {
-      throw new Error((aiData.error&&aiData.error.message)||'AI extraction failed');
-    }
-
-    // Parse JSON
-    var clean = aiText.trim();
-    if (clean.indexOf('```json') >= 0) clean = clean.split('```json')[1].split('```')[0].trim();
-    else if (clean.indexOf('```') >= 0) clean = clean.split('```')[1].split('```')[0].trim();
-
-    var result = {status: 'success', bond_fields: JSON.parse(clean), message: 'Successfully extracted from ' + file.name};
 
     if (result && result.status === 'success' && result.bond_fields) {
       var fields = result.bond_fields;

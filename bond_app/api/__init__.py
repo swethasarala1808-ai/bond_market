@@ -1424,3 +1424,367 @@ Return this exact JSON structure (null for missing fields):
     except Exception as e:
         frappe.log_error(str(e), "bond_ai_extract")
         return {"status": "error", "message": str(e)}
+
+
+# ─── BIZAXL OWN BOND AI (ZERO EXTERNAL DEPENDENCY) ───────────────────────────
+
+@frappe.whitelist(allow_guest=True)
+def bizaxl_bond_ai(bond_name, question, session_id=None):
+    """
+    Bizaxl's own built-in Bond AI Engine.
+    No API keys. No external services. Works entirely from your database.
+    """
+    try:
+        from bond_app.bond_engine import BondAIEngine
+
+        # ── Load all bond data from DB ──────────────────────────────────────
+        # Bond master
+        bonds = frappe.get_all(
+            "Bond Master",
+            filters=[["name", "=", bond_name]],
+            fields=["*"],
+            limit=1
+        )
+        bond_data = bonds[0] if bonds else {}
+
+        # Coupon schedule
+        coupons = frappe.get_all(
+            "Bond Coupon Schedule",
+            filters={"bond_name": bond_name},
+            fields=["*"],
+            order_by="coupon_number asc",
+            limit=50
+        )
+
+        # Step schedule
+        steps = frappe.get_all(
+            "Bond Step Schedule",
+            filters={"bond_name": bond_name},
+            fields=["*"],
+            order_by="period_from asc"
+        )
+
+        # Amortization schedule
+        amort = frappe.get_all(
+            "Bond Amortization Schedule",
+            filters={"bond_name": bond_name},
+            fields=["*"],
+            order_by="payment_number asc",
+            limit=50
+        )
+
+        # Uploaded documents (processed)
+        docs = frappe.get_all(
+            "Bond Document",
+            filters={"bond_name": bond_name},
+            fields=["document_name", "document_type", "processing_status",
+                    "extracted_text", "document_summary", "key_terms_json"],
+            order_by="modified desc",
+            limit=5
+        )
+        sources = [d.get("document_name", "") for d in docs if d.get("processing_status") == "Ready"]
+
+        # ── Run the engine ──────────────────────────────────────────────────
+        engine = BondAIEngine(
+            bond_data=dict(bond_data),
+            coupon_schedule=[dict(c) for c in coupons],
+            step_schedule=[dict(s) for s in steps],
+            amort_schedule=[dict(a) for a in amort],
+            documents=[dict(d) for d in docs]
+        )
+        answer = engine.answer(question)
+
+        # ── Save to chat history ────────────────────────────────────────────
+        if not session_id:
+            session_id = f"SESSION-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        try:
+            chat = frappe.get_doc({
+                "doctype": "Bond AI Chat",
+                "bond_name": bond_name,
+                "session_id": session_id,
+                "question": question,
+                "answer": answer,
+                "model_used": "Bizaxl-Bond-AI-v1",
+                "tokens_used": 0,
+                "asked_by": frappe.session.user,
+                "asked_on": datetime.datetime.now(),
+                "sources_cited": ", ".join(sources)
+            })
+            chat.insert(ignore_permissions=True)
+            frappe.db.commit()
+        except Exception:
+            pass
+
+        return {
+            "answer": answer,
+            "session_id": session_id,
+            "sources": sources,
+            "success": True,
+            "engine": "Bizaxl Bond AI v1"
+        }
+
+    except Exception as e:
+        frappe.log_error(str(e), "bizaxl_bond_ai")
+        return {
+            "answer": f"Error: {str(e)}",
+            "session_id": session_id or "",
+            "sources": [],
+            "success": False
+        }
+
+
+@frappe.whitelist(allow_guest=True)
+def bizaxl_bond_extract(file_url, document_name="Bond Document"):
+    """
+    Extract bond fields from uploaded document using built-in text parsing.
+    No external API needed.
+    """
+    try:
+        import re
+
+        # Read file
+        extracted_text = ""
+        try:
+            file_path = frappe.get_site_path() + file_url
+            with open(file_path, 'rb') as f:
+                raw = f.read()
+            extracted_text = raw.decode('utf-8', errors='ignore')
+        except Exception as fe:
+            return {"status": "error", "message": f"Cannot read file: {str(fe)}"}
+
+        if not extracted_text.strip():
+            return {"status": "error", "message": "File appears empty or is a scanned PDF (no text). Please use a text-based PDF or .txt file."}
+
+        text = extracted_text[:60000]
+
+        def find(patterns, default=None):
+            for p in patterns:
+                m = re.search(p, text, re.IGNORECASE)
+                if m:
+                    return m.group(1).strip()
+            return default
+
+        def find_amount(patterns):
+            for p in patterns:
+                m = re.search(p, text, re.IGNORECASE)
+                if m:
+                    val = m.group(1).replace(",", "").replace(" ", "")
+                    try:
+                        return float(val)
+                    except Exception:
+                        pass
+            return None
+
+        # Extract fields using regex patterns
+        fields = {}
+
+        # ISIN
+        isin = find([r'\bISIN[:\s]+([A-Z]{2}[A-Z0-9]{10})\b', r'\b(IN[A-Z0-9]{10})\b'])
+        if isin:
+            fields["isin"] = isin
+
+        # Bond name
+        name = find([
+            r'(?:Information Memorandum|Prospectus|Offer Document)\s+(?:for|of|on)\s+(.+?)(?:\n|dated)',
+            r'(?:Issue of|Issuance of|Offering of)\s+(.+?)(?:\n|by\s)',
+            r'(?:Bond|Debenture|NCD|Note)s?\s+(?:of|by)\s+(.+?)(?:\n|Rs\.|INR|USD|\d)',
+        ])
+        if name:
+            fields["bond_name"] = name[:100]
+
+        # Issuer
+        issuer = find([
+            r'(?:Issuer|Borrower|Company)[:\s]+([A-Z][A-Za-z\s&\.]+(?:Ltd|Limited|Inc|Corp|Bank|Finance|Capital)[\.A-Za-z]*)',
+            r'^([A-Z][A-Za-z\s&\.]+(?:Ltd|Limited|Bank|Finance|Capital)[\.A-Za-z]*)',
+        ])
+        if issuer:
+            fields["issuer_name"] = issuer.strip()
+
+        # Coupon rate
+        coupon = find([
+            r'(?:coupon rate|interest rate|rate of interest)[:\s]+(\d+\.?\d*)\s*%',
+            r'(\d+\.?\d*)\s*%\s*(?:per annum|p\.a\.|pa)',
+            r'at\s+(\d+\.?\d*)\s*%\s*(?:per|p\.)',
+        ])
+        if coupon:
+            try:
+                fields["coupon_rate"] = float(coupon)
+            except Exception:
+                pass
+
+        # Maturity
+        maturity = find([
+            r'(?:maturity date|redemption date|due date)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})',
+            r'(?:maturity date|redemption date)[:\s]+(\w+ \d{1,2},?\s*\d{4})',
+            r'(?:maturing on|redeemable on)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})',
+        ])
+        if maturity:
+            fields["maturity_date"] = maturity
+
+        # Issue date
+        issue_dt = find([
+            r'(?:issue date|dated)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})',
+            r'(?:date of issue|allotment date)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})',
+        ])
+        if issue_dt:
+            fields["issue_date"] = issue_dt
+
+        # Face value
+        fv = find_amount([
+            r'(?:face value|par value|denomination)[:\s]+(?:Rs\.?|INR|₹)\s*([\d,]+)',
+            r'(?:face value)[:\s]+([\d,]+)',
+        ])
+        if fv:
+            fields["face_value"] = fv
+
+        # Issue size
+        size = find_amount([
+            r'(?:total issue size|aggregate amount|issue size)[:\s]+(?:Rs\.?|INR|₹)?\s*([\d,]+(?:\.\d+)?)\s*(?:crore|cr|lakh|lac)?',
+        ])
+        if size:
+            # Handle crore/lakh
+            size_text = find([r'(?:total issue size|aggregate amount)[:\s]+(.{5,50})'])
+            if size_text and "crore" in size_text.lower():
+                size *= 10000000
+            elif size_text and "lakh" in size_text.lower():
+                size *= 100000
+            fields["total_issue_size"] = size
+
+        # Coupon frequency
+        freq_map = {
+            "monthly": "Monthly", "quarterly": "Quarterly",
+            "semi-annual": "Semi-Annual", "half-yearly": "Semi-Annual",
+            "half yearly": "Semi-Annual", "annual": "Annual", "yearly": "Annual",
+            "at maturity": "At Maturity", "zero": "At Maturity"
+        }
+        freq_text = find([r'(?:coupon|interest)\s+(?:payment\s+)?frequency[:\s]+(\w[\w\s\-]*)'])
+        if freq_text:
+            for k, v in freq_map.items():
+                if k in freq_text.lower():
+                    fields["coupon_frequency"] = v
+                    break
+
+        # Currency
+        if re.search(r'\bUSD\b|\bUS\$|\bdollar', text, re.I):
+            fields["issue_currency"] = "USD"
+        elif re.search(r'\bEUR\b|\beuro', text, re.I):
+            fields["issue_currency"] = "EUR"
+        elif re.search(r'\bGBP\b|\bsterling\b|\bpound\b', text, re.I):
+            fields["issue_currency"] = "GBP"
+        else:
+            fields["issue_currency"] = "INR"
+
+        # Coupon type
+        if re.search(r'zero.coupon|zero coupon|nil coupon', text, re.I):
+            fields["coupon_type"] = "Zero Coupon"
+        elif re.search(r'floating|variable|benchmark|mibor|sofr|euribor|libor', text, re.I):
+            fields["coupon_type"] = "Floating"
+        elif re.search(r'step.up|step up', text, re.I):
+            fields["coupon_type"] = "Step-Up"
+        elif re.search(r'step.down|step down', text, re.I):
+            fields["coupon_type"] = "Step-Down"
+        elif re.search(r'fixed', text, re.I):
+            fields["coupon_type"] = "Fixed"
+
+        # Bond type
+        if re.search(r'government|g-sec|gsec|sovereign|treasury', text, re.I):
+            fields["bond_type"] = "Government Bond"
+        elif re.search(r'convertible', text, re.I):
+            fields["bond_type"] = "Convertible"
+        elif re.search(r'zero.coupon', text, re.I):
+            fields["bond_type"] = "Zero Coupon"
+        else:
+            fields["bond_type"] = "Corporate Bond"
+
+        # Security type
+        if re.search(r'unsecured', text, re.I):
+            fields["security_type"] = "Unsecured"
+        elif re.search(r'secured', text, re.I):
+            fields["security_type"] = "Secured"
+
+        # ESG
+        esg_map = [
+            ("green bond", "Green Bond"), ("blue bond", "Blue Bond"),
+            ("social bond", "Social Bond"), ("sustainability bond", "Sustainability Bond"),
+            ("climate bond", "Climate Bond"), ("gender", "Gender Equality Bond"),
+            ("transition bond", "Transition Bond"), ("pandemic", "Pandemic Bond"),
+        ]
+        for keyword, esg_type in esg_map:
+            if re.search(keyword, text, re.I):
+                fields["esg_classification"] = esg_type
+                break
+        if "esg_classification" not in fields:
+            fields["esg_classification"] = "None"
+
+        # Credit rating
+        rating = find([
+            r'(?:rated|rating)[:\s]+([A-Za-z]+[+\-]?(?:/[A-Za-z]+[+\-]?)?)',
+            r'\b(AAA|AA\+|AA|AA\-|A\+|A\b|A\-|BBB\+|BBB|BB\+|BB|B\+|B\b)\b',
+        ])
+        if rating:
+            fields["credit_rating"] = rating
+
+        # Rating agency
+        for agency in ["CRISIL", "ICRA", "CARE", "India Ratings", "S&P", "Moody's", "Fitch"]:
+            if agency.lower() in text.lower():
+                fields["credit_rating_agency"] = agency
+                break
+
+        # Day count
+        if re.search(r'actual/actual|act/act', text, re.I):
+            fields["day_count_convention"] = "Actual/Actual"
+        elif re.search(r'actual/360|act/360', text, re.I):
+            fields["day_count_convention"] = "Actual/360"
+        elif re.search(r'30/360', text, re.I):
+            fields["day_count_convention"] = "30/360"
+        else:
+            fields["day_count_convention"] = "Actual/365"
+
+        # Callable
+        fields["is_callable"] = 1 if re.search(r'call option|callable|call date|call price', text, re.I) else 0
+        fields["is_puttable"] = 1 if re.search(r'put option|puttable|put date|put price', text, re.I) else 0
+        fields["is_convertible"] = 1 if re.search(r'convertible|conversion ratio|conversion price', text, re.I) else 0
+        fields["is_amortizing"] = 1 if re.search(r'amortiz|partial redemption|scheduled repayment', text, re.I) else 0
+
+        # Governing law
+        if re.search(r'english law|uk law|laws of england', text, re.I):
+            fields["governing_law"] = "UK English Law"
+        elif re.search(r'new york law|laws of new york|state of new york', text, re.I):
+            fields["governing_law"] = "New York Law"
+        else:
+            fields["governing_law"] = "Indian Law"
+
+        # Exchange
+        if re.search(r'\bNSE\b.*\bBSE\b|\bBSE\b.*\bNSE\b', text):
+            fields["exchange_listing"] = "NSE+BSE"
+        elif re.search(r'\bNSE\b', text):
+            fields["exchange_listing"] = "NSE"
+        elif re.search(r'\bBSE\b', text):
+            fields["exchange_listing"] = "BSE"
+        elif re.search(r'luxembourg|dublin|singapore', text, re.I):
+            fields["exchange_listing"] = find([r'(Luxembourg|Dublin|Singapore)'], "OTC")
+        else:
+            fields["exchange_listing"] = "OTC"
+
+        # Use of proceeds
+        uop = find([
+            r'(?:use of proceeds|utilisation of proceeds|utilization of proceeds)[:\s]+([^.]+\.)',
+            r'(?:proceeds.*?shall be used|funds.*?raised.*?will be used)\s+(?:for|towards)\s+(.+?)(?:\.|$)',
+        ])
+        if uop:
+            fields["use_of_proceeds"] = uop[:500]
+
+        # Remarks
+        fields["remarks"] = f"Auto-extracted from: {document_name}"
+
+        return {
+            "status": "success",
+            "bond_fields": fields,
+            "message": f"Extracted {len(fields)} fields from {document_name}",
+            "extracted_chars": len(text)
+        }
+
+    except Exception as e:
+        frappe.log_error(str(e), "bizaxl_bond_extract")
+        return {"status": "error", "message": str(e)}
