@@ -491,1012 +491,789 @@ def send_bond_maturity_alert(client_name, bond_name, maturity_date):
         return {"status": "error", "message": str(e)}
 
 
-# ─── AI BOND ASSISTANT ─────────────────────────────────────────────────────────
 
-@frappe.whitelist(allow_guest=True)
-def process_bond_document(bond_doc_name):
-    try:
-        import requests
-        settings = _get_settings()
-        api_key = settings.claude_api_key or ""
+# ─── BUILT-IN BOND AI ENGINE (NO EXTERNAL API KEY NEEDED) ─────────────────────
+# All analysis is done locally using bond data from the database.
+# Uploaded documents are searched for additional context.
 
-        doc = frappe.get_doc("Bond Document", bond_doc_name)
-        doc.processing_status = "Processing"
-        doc.save(ignore_permissions=True)
-        frappe.db.commit()
+import re as _re
 
-        extracted = doc.extracted_text or ""
-        if not extracted and doc.file_attachment:
-            try:
-                file_doc = frappe.get_all("File", filters={"file_url": doc.file_attachment}, fields=["name", "file_url"])
-                if file_doc:
-                    file_path = frappe.get_site_path() + file_doc[0].file_url
-                    with open(file_path, 'rb') as f:
-                        content = f.read()
-                    try:
-                        extracted = content.decode('utf-8', errors='ignore')
-                    except Exception:
-                        extracted = str(content)
-            except Exception as fe:
-                extracted = f"File extraction attempted: {str(fe)}"
+class _BondEngine:
+    """Self-contained bond analysis engine. No external API needed."""
 
-        if extracted or doc.document_url:
-            prompt = f"""Analyze this bond document and extract ALL key information in structured format.
+    def __init__(self, bond, coupons, steps, amort, documents):
+        self.b = bond or {}
+        self.coupons = coupons or []
+        self.steps = steps or []
+        self.amort = amort or []
+        self.doc_text = " ".join([
+            (d.get("extracted_text") or d.get("document_summary") or "")
+            for d in (documents or [])
+        ])[:80000]
+        self.doc_names = [d.get("document_name","") for d in (documents or [])]
 
-Document: {doc.document_name} ({doc.document_type})
-Bond: {doc.bond_name}
+    def answer(self, q):
+        ql = q.lower().strip()
+        if any(w in ql for w in ["coupon schedule","payment schedule","all coupon","all payment","list coupon"]):
+            return self._coupon_schedule()
+        if any(w in ql for w in ["next coupon","next payment","upcoming coupon","when is next","upcoming payment"]):
+            return self._next_coupon()
+        if any(w in ql for w in ["coupon rate","interest rate","what rate","coupon %","rate per"]):
+            return self._coupon_rate()
+        if any(w in ql for w in ["ytm","yield to maturity","yield to call","ytc","calculate yield"]):
+            return self._yield_analysis()
+        if any(w in ql for w in ["amortiz","principal repay","principal schedule","amort"]):
+            return self._amortization()
+        if any(w in ql for w in ["step-up","step up","step schedule","step-down","step rate"]):
+            return self._step_schedule()
+        if any(w in ql for w in ["risk factor","credit risk","default risk","market risk","risk"]):
+            return self._risk_factors()
+        if any(w in ql for w in ["covenant","restriction","negative covenant","events of default","affirmative"]):
+            return self._covenants()
+        if any(w in ql for w in ["esg","green bond","use of proceed","sustainability","climate bond","social bond"]):
+            return self._esg()
+        if any(w in ql for w in ["call option","callable","call date","call price","call feature"]):
+            return self._call_option()
+        if any(w in ql for w in ["put option","puttable","put date","put feature"]):
+            return self._put_option()
+        if any(w in ql for w in ["convert","convertible","conversion ratio","conversion price"]):
+            return self._convertible()
+        if any(w in ql for w in ["maturity","matures","maturity date","redemption date","when does"]):
+            return self._maturity()
+        if any(w in ql for w in ["issuer","who issued","company name","issuer name"]):
+            return self._issuer()
+        if any(w in ql for w in ["isin","identifier","cusip","bond code"]):
+            return self._identifiers()
+        if any(w in ql for w in ["rating","credit rating","crisil","icra","care","moody","fitch","s&p"]):
+            return self._rating()
+        if any(w in ql for w in ["day count","accrued interest","accrual","30/360","actual/actual"]):
+            return self._day_count()
+        if any(w in ql for w in ["duration","modified duration","macaulay duration","dv01"]):
+            return self._duration()
+        if any(w in ql for w in ["face value","par value","principal amount","nominal value"]):
+            return self._face_value()
+        if any(w in ql for w in ["issue size","total issue","outstanding amount","amount issued"]):
+            return self._issue_size()
+        if any(w in ql for w in ["currency","inr","usd","eur","denomination"]):
+            return self._currency()
+        if any(w in ql for w in ["exchange","listed","nse","bse","listing"]):
+            return self._listing()
+        if any(w in ql for w in ["law","governing","jurisdiction","legal"]):
+            return self._legal()
+        if any(w in ql for w in ["security","secured","unsecured","collateral"]):
+            return self._security()
+        if any(w in ql for w in ["summary","overview","about this bond","tell me about","details","describe"]):
+            return self._summary()
+        if any(w in ql for w in ["calculate","compute","how much","accrue","interest for"]):
+            return self._calculation(q)
+        # Search uploaded documents
+        doc_ans = self._search_docs(q)
+        if doc_ans:
+            return doc_ans
+        return self._general()
 
-Text/Content:
-{extracted[:40000] if extracted else "Document URL provided: " + str(doc.document_url)}
+    def _summary(self):
+        b = self.b
+        lines = [
+            "## Bond Summary — " + b.get("bond_name",""),
+            "",
+            "| Field | Value |",
+            "|-------|-------|",
+            "| **ISIN** | `" + b.get("isin","N/A") + "` |",
+            "| **Issuer** | " + b.get("issuer_name","N/A") + " (" + b.get("issuer_type","") + ") |",
+            "| **Bond Type** | " + b.get("bond_type","N/A") + " |",
+            "| **Coupon** | **" + str(b.get("coupon_rate",0)) + "%** " + b.get("coupon_type","") + " " + b.get("coupon_frequency","") + " |",
+            "| **Issue Date** | " + str(b.get("issue_date","N/A")) + " |",
+            "| **Maturity Date** | " + str(b.get("maturity_date","N/A")) + " |",
+            "| **Tenor** | " + str(b.get("tenor_years","N/A")) + " years |",
+            "| **Face Value** | " + self._fmt(b.get("face_value")) + " |",
+            "| **Total Issue Size** | " + self._fmt(b.get("total_issue_size")) + " |",
+            "| **Credit Rating** | " + b.get("credit_rating","N/A") + " (" + b.get("credit_rating_agency","N/A") + ") — " + b.get("rating_outlook","") + " |",
+            "| **Security** | " + b.get("security_type","N/A") + " |",
+            "| **Currency** | " + b.get("issue_currency","INR") + " |",
+            "| **Exchange** | " + b.get("exchange_listing","N/A") + " |",
+            "| **ESG** | " + b.get("esg_classification","None") + " |",
+            "| **Day Count** | " + b.get("day_count_convention","N/A") + " |",
+        ]
+        if b.get("is_callable"):
+            lines.append("| **Call Date** | " + str(b.get("call_date","N/A")) + " at " + str(b.get("call_price","N/A")) + " |")
+        if b.get("is_convertible"):
+            lines.append("| **Convertible** | Yes — ratio " + str(b.get("conversion_ratio","")) + " |")
+        if b.get("use_of_proceeds"):
+            lines += ["", "**Use of Proceeds:** " + b.get("use_of_proceeds","")]
+        if self.coupons:
+            lines += ["", "**" + str(len(self.coupons)) + " coupon payments** in schedule. Ask *'Show coupon schedule'* for full list."]
+        if self.doc_names:
+            lines += ["", "**Uploaded Documents:** " + ", ".join(self.doc_names)]
+        return "\n".join(lines)
 
-Extract and provide:
-1. BOND SUMMARY (2-3 paragraphs)
-2. KEY TERMS JSON with: issuer, isin, issue_date, maturity_date, coupon_rate, coupon_type, coupon_frequency, principal_amount, currency, credit_rating, day_count_convention, governing_law, call_option, put_option, conversion_terms
-3. COUPON SCHEDULE summary
-4. RISK FACTORS (top 5)
-5. COVENANTS (key ones)
-6. USE OF PROCEEDS
-7. ESG DETAILS (if applicable)
-
-Format response as valid JSON only with keys: summary, key_terms, coupon_summary, risk_factors, covenants, use_of_proceeds, esg_details"""
-
-            response = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "Content-Type": "application/json",
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01"
-                },
-                json={
-                    "model": "claude-sonnet-4-20250514",
-                    "max_tokens": 4000,
-                    "messages": [{"role": "user", "content": prompt}]
-                },
-                timeout=120
+    def _coupon_schedule(self):
+        b = self.b
+        if not self.coupons:
+            fv = b.get("face_value",0) or 0
+            rate = b.get("coupon_rate",0) or 0
+            freq = b.get("coupon_frequency","Semi-Annual")
+            amt = (float(fv) * float(rate) / 100) / self._ppY(freq) if fv and rate else 0
+            return (
+                "## Coupon Schedule — " + b.get("bond_name","") + "\n\n"
+                "No individual coupon records stored yet.\n\n"
+                "**Bond Terms:**\n"
+                "- Coupon Rate: **" + str(rate) + "% p.a.**\n"
+                "- Frequency: " + freq + "\n"
+                "- Face Value: " + self._fmt(fv) + "\n"
+                "- Day Count: " + b.get("day_count_convention","Actual/Actual") + "\n\n"
+                "**Estimated coupon per unit:**\n"
+                "= " + self._fmt(fv) + " × " + str(rate) + "% ÷ " + str(self._ppY(freq)) + " = **" + self._fmt(amt) + "**"
             )
-            result = response.json()
-            ai_output = result.get("content", [{}])[0].get("text", "")
+        today = str(datetime.date.today())
+        lines = [
+            "## Coupon Schedule — " + b.get("bond_name",""),
+            "",
+            "Rate: **" + str(b.get("coupon_rate",0)) + "% p.a.** | Frequency: " + b.get("coupon_frequency","") + " | Day Count: " + b.get("day_count_convention",""),
+            "",
+            "| # | Date | Rate | Amt/Unit | Total | Status |",
+            "|---|------|------|----------|-------|--------|",
+        ]
+        paid_count = 0
+        total_paid = 0
+        total_pending = 0
+        for c in self.coupons:
+            s = c.get("status","Upcoming")
+            marker = " ◀ NEXT" if s == "Upcoming" and paid_count == len([x for x in self.coupons if x.get("status")=="Paid"]) else ""
+            lines.append(
+                "| " + str(c.get("coupon_number","?")) +
+                " | " + str(c.get("coupon_date","?")) +
+                " | " + str(c.get("coupon_rate_applicable",0)) + "%" +
+                " | " + self._fmt(c.get("coupon_amount_per_unit",0)) +
+                " | " + self._fmt(c.get("total_coupon_amount",0)) +
+                " | " + s + marker + " |"
+            )
+            if s == "Paid":
+                paid_count += 1
+                total_paid += c.get("total_coupon_amount",0) or 0
+            else:
+                total_pending += c.get("total_coupon_amount",0) or 0
+        lines += [
+            "",
+            "**Total Paid:** " + self._fmt(total_paid) + " | **Total Pending:** " + self._fmt(total_pending),
+        ]
+        return "\n".join(lines)
 
+    def _next_coupon(self):
+        b = self.b
+        today = str(datetime.date.today())
+        upcoming = [c for c in self.coupons if str(c.get("coupon_date","")) > today and c.get("status") != "Paid"]
+        if upcoming:
+            c = upcoming[0]
+            return (
+                "## Next Coupon Payment — " + b.get("bond_name","") + "\n\n"
+                "| Field | Value |\n|-------|-------|\n"
+                "| **Coupon #** | " + str(c.get("coupon_number","?")) + " |\n"
+                "| **Payment Date** | **" + str(c.get("coupon_date","N/A")) + "** |\n"
+                "| **Rate** | " + str(c.get("coupon_rate_applicable",0)) + "% p.a. |\n"
+                "| **Amount per Unit** | **" + self._fmt(c.get("coupon_amount_per_unit",0)) + "** |\n"
+                "| **Total Payable** | " + self._fmt(c.get("total_coupon_amount",0)) + " |\n"
+                "| **Record Date** | " + str(c.get("record_date","N/A")) + " |\n"
+                "| **Status** | " + c.get("status","Upcoming") + " |\n\n"
+                "*" + str(len(upcoming)) + " coupon payment(s) remaining till maturity.*"
+            )
+        fv = b.get("face_value",0) or 0
+        rate = b.get("coupon_rate",0) or 0
+        freq = b.get("coupon_frequency","Semi-Annual")
+        amt = (float(fv)*float(rate)/100)/self._ppY(freq) if fv and rate else 0
+        return (
+            "## Next Coupon — " + b.get("bond_name","") + "\n\n"
+            "No upcoming coupon records in schedule.\n\n"
+            "**Estimated from bond terms:**\n"
+            "- Coupon Rate: " + str(rate) + "% p.a.\n"
+            "- Frequency: " + freq + "\n"
+            "- Face Value: " + self._fmt(fv) + "\n"
+            "- Expected Amount/Unit: **" + self._fmt(amt) + "**"
+        )
+
+    def _coupon_rate(self):
+        b = self.b
+        fv = b.get("face_value",0) or 0
+        rate = b.get("coupon_rate",0) or 0
+        freq = b.get("coupon_frequency","Semi-Annual")
+        amt = (float(fv)*float(rate)/100)/self._ppY(freq) if fv and rate else 0
+        lines = [
+            "## Coupon Rate — " + b.get("bond_name",""),
+            "",
+            "| Parameter | Value |",
+            "|-----------|-------|",
+            "| **Coupon Type** | " + b.get("coupon_type","Fixed") + " |",
+            "| **Annual Coupon Rate** | **" + str(rate) + "% per annum** |",
+            "| **Coupon Frequency** | " + freq + " |",
+            "| **Day Count Convention** | " + b.get("day_count_convention","Actual/Actual") + " |",
+        ]
+        if b.get("coupon_type") in ("Floating","Variable"):
+            lines += [
+                "| **Benchmark Rate** | " + str(b.get("benchmark_rate","N/A")) + " |",
+                "| **Spread (bps)** | " + str(b.get("spread_bps",0)) + " |",
+            ]
+        if fv and rate:
+            lines += [
+                "",
+                "### Coupon Calculation",
+                "Coupon per unit = Face Value × Annual Rate ÷ Periods per Year",
+                "= " + self._fmt(fv) + " × " + str(rate) + "% ÷ " + str(self._ppY(freq)),
+                "= **" + self._fmt(amt) + " per coupon payment**",
+                "",
+                "Annual interest income per unit = **" + self._fmt(amt * self._ppY(freq)) + "**",
+            ]
+        if self.steps:
+            lines += ["", "### Step-Up Rate Schedule", "| Period | Rate | Type |", "|--------|------|------|"]
+            for s in self.steps:
+                lines.append("| " + str(s.get("period_from","")) + " → " + str(s.get("period_to","")) + " | **" + str(s.get("coupon_rate",0)) + "%** | " + s.get("rate_type","") + " |")
+        return "\n".join(lines)
+
+    def _yield_analysis(self):
+        b = self.b
+        rate = b.get("coupon_rate",0) or 0
+        fv = b.get("face_value",0) or 0
+        tenor = b.get("tenor_years",0) or 0
+        freq = b.get("coupon_frequency","Semi-Annual")
+        ann_coupon = (float(fv)*float(rate)/100) if fv and rate else 0
+        lines = [
+            "## Yield Analysis — " + b.get("bond_name",""),
+            "",
+            "**Face Value:** " + self._fmt(fv) + " | **Coupon Rate:** " + str(rate) + "% p.a. | **Maturity:** " + str(b.get("maturity_date","N/A")),
+            "",
+            "### Yield to Maturity (YTM) Formula",
+            "```",
+            "YTM ≈ [Annual Coupon + (Face Value - Price) / Years] / [(Face Value + Price) / 2]",
+            "```",
+            "",
+        ]
+        if fv and rate and tenor:
+            lines += [
+                "### At Different Market Prices",
+                "| Market Price | Premium/Discount | Approx YTM |",
+                "|-------------|-----------------|------------|",
+            ]
+            for pct in [92, 95, 97, 100, 103, 105, 108]:
+                price = float(fv) * pct / 100
+                ytm = ((ann_coupon + (float(fv)-price)/float(tenor)) / ((float(fv)+price)/2)) * 100
+                pd = "At Par" if pct==100 else ("Premium +" + str(pct-100) + "%" if pct>100 else "Discount -" + str(100-pct) + "%")
+                lines.append("| " + self._fmt(price) + " | " + pd + " | **" + str(round(ytm,2)) + "%** |")
+            lines += [
+                "",
+                "**When trading at par:** YTM = Coupon Rate = " + str(rate) + "%",
+                "**When at discount:** YTM > Coupon Rate",
+                "**When at premium:** YTM < Coupon Rate",
+            ]
+        lines += ["", "*Provide the current market price for exact YTM calculation.*"]
+        return "\n".join(lines)
+
+    def _amortization(self):
+        b = self.b
+        if not self.amort:
+            is_amort = b.get("is_amortizing",0)
+            return (
+                "## Amortization — " + b.get("bond_name","") + "\n\n"
+                + ("No amortization schedule records stored.\n\n"
+                   "**Is Amortizing:** " + ("Yes" if is_amort else "No — This is a **BULLET BOND**") + "\n\n"
+                   + ("Entire principal of **" + self._fmt(b.get("face_value",0)) + "** is repaid in one lump sum on maturity date **" + str(b.get("maturity_date","N/A")) + "**."
+                      if not is_amort else
+                      "Please add amortization schedule records in the Bond Amortization Schedule doctype."))
+            )
+        lines = [
+            "## Amortization Schedule — " + b.get("bond_name",""),
+            "",
+            "| # | Date | Opening Principal | Coupon | Principal Repaid | Total Payment | Closing Principal |",
+            "|---|------|-------------------|--------|-----------------|---------------|-------------------|",
+        ]
+        for a in self.amort:
+            lines.append(
+                "| " + str(a.get("payment_number","?")) +
+                " | " + str(a.get("payment_date","?")) +
+                " | " + self._fmt(a.get("opening_principal",0)) +
+                " | " + self._fmt(a.get("coupon_payment",0)) +
+                " | " + self._fmt(a.get("principal_payment",0)) +
+                " | " + self._fmt(a.get("total_payment",0)) +
+                " | " + self._fmt(a.get("closing_principal",0)) + " |"
+            )
+        return "\n".join(lines)
+
+    def _step_schedule(self):
+        b = self.b
+        if not self.steps:
+            return (
+                "## Step Schedule — " + b.get("bond_name","") + "\n\n"
+                "**Coupon Type:** " + b.get("coupon_type","N/A") + "\n\n"
+                + ("No step schedule records found. This bond has a fixed coupon of **" + str(b.get("coupon_rate",0)) + "% p.a.**"
+                   if b.get("coupon_type") != "Step-Up" else
+                   "Please add step schedule records in Bond Step Schedule doctype.")
+            )
+        lines = [
+            "## Step-Up/Down Coupon Schedule — " + b.get("bond_name",""),
+            "",
+            "| Period From | Period To | Coupon Rate | Type | Benchmark | Spread (bps) |",
+            "|-------------|-----------|-------------|------|-----------|-------------|",
+        ]
+        for s in self.steps:
+            lines.append(
+                "| " + str(s.get("period_from","")) +
+                " | " + str(s.get("period_to","")) +
+                " | **" + str(s.get("coupon_rate",0)) + "%** |" +
+                " " + s.get("rate_type","") +
+                " | " + s.get("benchmark","-") +
+                " | " + str(s.get("spread_bps",0)) + " |"
+            )
+        return "\n".join(lines)
+
+    def _risk_factors(self):
+        b = self.b
+        rating = b.get("credit_rating","")
+        risk_lvl = ("Low" if any(x in (rating or "") for x in ["AAA","Sovereign","Gilt"]) else
+                    "Moderate-Low" if "AA" in (rating or "") else
+                    "Moderate" if "A" in (rating or "") else
+                    "High" if any(x in (rating or "") for x in ["B","BB","C","D"]) else "Moderate")
+        doc_sec = self._extract_section("risk|default|credit risk", 1500)
+        lines = [
+            "## Risk Factors — " + b.get("bond_name",""),
+            "",
+            "### 1. Credit Risk — **" + risk_lvl + "**",
+            "- Rating: **" + (rating or "N/A") + "** (" + b.get("credit_rating_agency","") + ") | Outlook: " + b.get("rating_outlook","N/A"),
+            "- Issuer: " + b.get("issuer_name","N/A") + " (" + b.get("issuer_type","") + ")",
+            "",
+            "### 2. Interest Rate (Duration) Risk",
+            "- Tenor: **" + str(b.get("tenor_years","?")) + " years** — " + ("High duration risk" if (b.get("tenor_years") or 0) > 10 else "Moderate duration risk" if (b.get("tenor_years") or 0) > 5 else "Lower duration risk"),
+            "- Coupon Type: " + b.get("coupon_type","Fixed"),
+            "- " + ("Fixed rate — price falls if market rates rise" if b.get("coupon_type")=="Fixed" else "Floating rate — resets with market; lower duration risk"),
+            "",
+            "### 3. Liquidity Risk",
+            "- Exchange: " + b.get("exchange_listing","N/A") + " | Security: " + b.get("security_type","N/A"),
+            "",
+            "### 4. Reinvestment Risk",
+            "- " + b.get("coupon_frequency","") + " coupons — must be reinvested at current market rates",
+            "",
+            "### 5. Call Risk",
+            "- " + ("**Callable** on " + str(b.get("call_date","?")) + " at " + str(b.get("call_price","?")) + " — issuer may redeem early" if b.get("is_callable") else "Not callable — no early redemption risk"),
+        ]
+        if b.get("esg_classification") and b.get("esg_classification") != "None":
+            lines += ["", "### 6. ESG/Greenwashing Risk", "- ESG classification must be verified by third-party verifier", "- Annual use-of-proceeds reporting required"]
+        if doc_sec:
+            lines += ["", "### From Prospectus:", "", doc_sec]
+        return "\n".join(lines)
+
+    def _covenants(self):
+        b = self.b
+        doc_sec = self._extract_section("covenant|restriction|event of default", 1500)
+        lines = [
+            "## Covenants & Restrictions — " + b.get("bond_name",""),
+            "",
+            "**Issuer:** " + b.get("issuer_name","N/A") + " | **Security:** " + b.get("security_type","N/A"),
+            "",
+            "### Negative Covenants (Restrictions on Issuer)",
+            "- No additional secured borrowings above agreed limit without bondholder consent",
+            "- No disposal of core assets without disclosure",
+            "- Dividend restrictions if key financial ratios breach thresholds",
+            "- No material change in business without notification",
+            "",
+            "### Affirmative Covenants (Obligations of Issuer)",
+            "- Quarterly/annual financial reporting to bondholders",
+            "- Notify on material events (rating change, litigation, restructuring)",
+            "- Maintain credit rating (rating trigger covenants)",
+            "- Preserve " + ("pledged security/collateral" if b.get("security_type")=="Secured" else "financial health ratios"),
+            "",
+            "### Events of Default",
+            "- Non-payment of coupon or principal on due date (grace period: typically 30 days)",
+            "- Cross-default on other material debt obligations",
+            "- Insolvency / winding up proceedings",
+            "- Material Adverse Change (MAC clause)",
+            "- Rating downgrade below trigger level",
+        ]
+        if b.get("is_callable"):
+            lines += ["", "### Call Provisions", "- Issuer may redeem on **" + str(b.get("call_date","?")) + "** at **" + str(b.get("call_price","?")) + "**"]
+        if b.get("is_puttable"):
+            lines += ["", "### Put Provisions", "- Investor may sell back on **" + str(b.get("put_date","?")) + "** at **" + str(b.get("put_price","?")) + "**"]
+        if doc_sec:
+            lines += ["", "### From Prospectus:", "", doc_sec]
+        return "\n".join(lines)
+
+    def _esg(self):
+        b = self.b
+        esg = b.get("esg_classification","None")
+        if esg == "None":
+            return "## ESG — " + b.get("bond_name","") + "\n\nThis bond is **not classified as an ESG bond**. It is a standard " + b.get("bond_type","corporate") + " bond."
+        doc_sec = self._extract_section("esg|green|sustainability|climate|social bond|proceeds", 1500)
+        lines = [
+            "## ESG Classification — " + b.get("bond_name",""),
+            "",
+            "### Classification: **" + esg + "**",
+            "",
+            "| Parameter | Details |",
+            "|-----------|---------|",
+            "| ESG Type | **" + esg + "** |",
+            "| Issuer | " + b.get("issuer_name","N/A") + " |",
+            "| Issue Size | " + self._fmt(b.get("total_issue_size")) + " |",
+            "| Currency | " + b.get("issue_currency","INR") + " |",
+        ]
+        if b.get("use_of_proceeds"):
+            lines += ["", "### Use of Proceeds", "", b.get("use_of_proceeds","")]
+        esg_desc = {
+            "Green Bond": "Finances projects with clear environmental benefits — renewable energy, energy efficiency, clean transport, sustainable water, pollution prevention.",
+            "Blue Bond": "Finances ocean and water sustainability — marine protected areas, sustainable fisheries, wastewater treatment.",
+            "Social Bond": "Finances projects with positive social outcomes — affordable housing, healthcare, education, employment for underserved populations.",
+            "Sustainability Bond": "Combines both Green and Social project categories.",
+            "Climate Bond": "Finances climate change mitigation and adaptation projects — aligned with the Paris Agreement 1.5°C pathway.",
+        }
+        if esg in esg_desc:
+            lines += ["", "**About " + esg + "s:** " + esg_desc[esg]]
+        lines += [
+            "", "### ESG Reporting Requirements",
+            "- Annual Use of Proceeds Report",
+            "- Impact Reporting (CO₂ avoided, MW renewable energy, beneficiaries etc.)",
+            "- Third-party verification recommended (SEBI Green Bond guidelines)"
+        ]
+        if doc_sec:
+            lines += ["", "### From Prospectus:", "", doc_sec]
+        return "\n".join(lines)
+
+    def _call_option(self):
+        b = self.b
+        if not b.get("is_callable"):
+            return "## Call Option — " + b.get("bond_name","") + "\n\nThis bond **is NOT callable**. The issuer cannot redeem it before maturity on " + str(b.get("maturity_date","N/A")) + ". Investors are protected from early redemption."
+        return (
+            "## Call Option — " + b.get("bond_name","") + "\n\n"
+            "⚠️ This bond **IS CALLABLE**\n\n"
+            "| Parameter | Details |\n|-----------|--------|\n"
+            "| Call Date | **" + str(b.get("call_date","N/A")) + "** |\n"
+            "| Call Price | **" + str(b.get("call_price","N/A")) + "** |\n"
+            "| Maturity Date | " + str(b.get("maturity_date","N/A")) + " |\n\n"
+            "**Impact on investors:**\n"
+            "- Issuer (" + b.get("issuer_name","") + ") can redeem this bond on the call date\n"
+            "- Bondholders receive the call price — may be at par or slight premium\n"
+            "- Typically exercised when market rates fall (issuer can refinance cheaper)\n"
+            "- Yield to Call (YTC) may differ significantly from Yield to Maturity (YTM)\n"
+            "- Always evaluate both YTM and YTC when purchasing callable bonds"
+        )
+
+    def _put_option(self):
+        b = self.b
+        if not b.get("is_puttable"):
+            return "## Put Option — " + b.get("bond_name","") + "\n\nThis bond **is NOT puttable**. Investors cannot sell it back to the issuer before maturity."
+        return (
+            "## Put Option — " + b.get("bond_name","") + "\n\n"
+            "✅ This bond **IS PUTTABLE** — investors can sell back to issuer\n\n"
+            "| Put Date | Put Price |\n|----------|----------|\n"
+            "| **" + str(b.get("put_date","N/A")) + "** | **" + str(b.get("put_price","N/A")) + "** |\n\n"
+            "**This protects investors** — if rates rise, you can put back and reinvest at higher rates."
+        )
+
+    def _convertible(self):
+        b = self.b
+        if not b.get("is_convertible"):
+            return "## Convertible Feature — " + b.get("bond_name","") + "\n\nThis bond **is NOT convertible**. It is a straight debt instrument with no equity conversion feature."
+        return (
+            "## Convertible Bond — " + b.get("bond_name","") + "\n\n"
+            "✅ This bond **IS CONVERTIBLE** into equity shares\n\n"
+            "| Parameter | Details |\n|-----------|--------|\n"
+            "| Conversion Ratio | **" + str(b.get("conversion_ratio","N/A")) + "** shares per bond |\n"
+            "| Conversion Price | **" + str(b.get("conversion_price","N/A")) + "** |\n\n"
+            "**Conversion Value = Conversion Ratio × Current Share Price**\n"
+            "When share price > conversion price, conversion is in-the-money."
+        )
+
+    def _maturity(self):
+        b = self.b
+        maturity = b.get("maturity_date")
+        today = datetime.date.today()
+        lines = [
+            "## Maturity Details — " + b.get("bond_name",""),
+            "",
+            "| Field | Value |",
+            "|-------|-------|",
+            "| **Maturity Date** | **" + str(maturity or "N/A") + "** |",
+            "| **Issue Date** | " + str(b.get("issue_date","N/A")) + " |",
+            "| **Tenor** | " + str(b.get("tenor_years","N/A")) + " years |",
+        ]
+        if maturity:
             try:
-                clean = ai_output
-                if "```json" in clean:
-                    clean = clean.split("```json")[1].split("```")[0].strip()
-                elif "```" in clean:
-                    clean = clean.split("```")[1].split("```")[0].strip()
-                parsed = json.loads(clean)
-                doc.document_summary = parsed.get("summary", "")
-                doc.key_terms_json = json.dumps(parsed.get("key_terms", {}), indent=2)
-                doc.covenants_extracted = 1
-                doc.risk_factors_extracted = 1
-                if parsed.get("esg_details"):
-                    doc.esg_details_extracted = 1
+                mat = datetime.date.fromisoformat(str(maturity))
+                days = (mat - today).days
+                if days > 0:
+                    lines += [
+                        "| **Days to Maturity** | " + str(days) + " days (" + str(round(days/365.25,2)) + " years) |",
+                        "| **Status** | 🟢 Active |",
+                    ]
+                    if days <= 30:
+                        lines.append("\n⚠️ **MATURING IN " + str(days) + " DAYS — Alert your RM immediately!**")
+                    elif days <= 90:
+                        lines.append("\n⚠️ Maturing within 90 days — plan for reinvestment.")
+                else:
+                    lines.append("| **Status** | ✅ MATURED " + str(abs(days)) + " days ago |")
             except Exception:
-                doc.document_summary = ai_output[:2000]
-                doc.key_terms_json = "{}"
+                pass
+        lines += [
+            "",
+            "### At Maturity",
+            "- Principal: **" + self._fmt(b.get("face_value",0)) + "** per unit repaid",
+            "- Plus final coupon payment",
+            "- Total redemption = Face Value + Final Coupon",
+        ]
+        return "\n".join(lines)
 
-        doc.extracted_text = extracted[:100000] if extracted else ""
-        doc.processing_status = "Ready"
-        doc.processed_on = datetime.datetime.now()
-        doc.coupon_details_extracted = 1
-        doc.save(ignore_permissions=True)
-        frappe.db.commit()
-        return {"status": "success", "message": "Document processed successfully"}
-    except Exception as e:
-        frappe.log_error(str(e), "process_bond_document")
+    def _issuer(self):
+        b = self.b
+        return ("## Issuer — " + b.get("bond_name","") + "\n\n"
+                "| Field | Value |\n|-------|-------|\n"
+                "| **Issuer Name** | **" + b.get("issuer_name","N/A") + "** |\n"
+                "| **Issuer Type** | " + b.get("issuer_type","N/A") + " |\n"
+                "| **SEBI Registration** | " + b.get("sebi_registration","N/A") + " |\n"
+                "| **Governing Law** | " + b.get("governing_law","N/A") + " |\n"
+                "| **Payment Location** | " + b.get("payment_location","N/A") + " |")
+
+    def _identifiers(self):
+        b = self.b
+        return ("## Bond Identifiers\n\n"
+                "- **ISIN:** `" + b.get("isin","N/A") + "`\n"
+                "- **Bond Name:** " + b.get("bond_name","N/A") + "\n"
+                "- **Exchange:** " + b.get("exchange_listing","N/A") + "\n"
+                "- **SEBI Reg:** " + b.get("sebi_registration","N/A"))
+
+    def _rating(self):
+        b = self.b
+        r = b.get("credit_rating","N/A")
+        meaning = ("Highest Safety — virtually no default risk" if "AAA" in (r or "") else
+                   "High Safety — very low default risk" if "AA" in (r or "") else
+                   "Adequate Safety — low default risk" if r and r.startswith("A") else
+                   "Moderate Safety — some default risk" if "BBB" in (r or "") else
+                   "Speculative / High Yield — significant risk" if any(x in (r or "") for x in ["BB","B","C","D"]) else "")
+        return (
+            "## Credit Rating — " + b.get("bond_name","") + "\n\n"
+            "| Field | Value |\n|-------|-------|\n"
+            "| **Rating** | **" + r + "** |\n"
+            "| **Agency** | " + b.get("credit_rating_agency","N/A") + " |\n"
+            "| **Outlook** | " + b.get("rating_outlook","N/A") + " |\n"
+            "| **Meaning** | " + meaning + " |\n\n"
+            "### Rating Scale (India)\n"
+            "| Rating | Safety Level |\n|--------|-------------|\n"
+            "| AAA | Highest |\n| AA+/AA/AA- | High |\n| A+/A/A- | Adequate |\n"
+            "| BBB | Moderate |\n| BB and below | Speculative |"
+        )
+
+    def _day_count(self):
+        b = self.b
+        dc = b.get("day_count_convention","Actual/Actual")
+        fv = b.get("face_value",0) or 0
+        rate = b.get("coupon_rate",0) or 0
+        lines = [
+            "## Day Count Convention — " + b.get("bond_name",""),
+            "",
+            "**Convention Used:** **" + dc + "**",
+            "",
+            "| Convention | Formula | Used In |",
+            "|------------|---------|---------|",
+            "| Actual/Actual | Actual days / Actual year (365 or 366) | Govt Bonds, US Treasuries |",
+            "| Actual/365 | Actual days / 365 | Indian Corp Bonds, UK Gilts |",
+            "| Actual/360 | Actual days / 360 | Money market, Eurobonds |",
+            "| 30/360 | 30-day months / 360 | US Corp Bonds |",
+        ]
+        if fv and rate:
+            year_days = 360 if "360" in dc else 365
+            lines += ["", "### Accrued Interest Examples for This Bond", "", "| Days | Formula | Accrued Interest |", "|------|---------|-----------------|"]
+            for days in [30, 90, 180, 365]:
+                calc_days = round(days/365*360) if "30/" in dc else days
+                accrued = float(fv) * float(rate)/100 * calc_days/year_days
+                lines.append("| " + str(days) + " days | " + self._fmt(fv) + " × " + str(rate) + "% × " + str(calc_days) + "/" + str(year_days) + " | **" + self._fmt(accrued) + "** |")
+        return "\n".join(lines)
+
+    def _duration(self):
+        b = self.b
+        tenor = b.get("tenor_years",0) or 0
+        rate = b.get("coupon_rate",0) or 0
+        mac_dur = round(tenor * 0.85 if rate > 0 else tenor, 2)
+        mod_dur = round(mac_dur / (1 + float(rate)/100/2), 2)
+        return (
+            "## Duration Analysis — " + b.get("bond_name","") + "\n\n"
+            "| Measure | Value |\n|---------|-------|\n"
+            "| **Tenor** | " + str(tenor) + " years |\n"
+            "| **Coupon Rate** | " + str(rate) + "% |\n"
+            "| **Macaulay Duration** | ~" + str(mac_dur) + " years |\n"
+            "| **Modified Duration** | ~" + str(mod_dur) + " |\n\n"
+            "**Interpretation:**\n"
+            "- A 1% (100bps) rise in interest rates → ~" + str(mod_dur) + "% fall in bond price\n"
+            "- A 1% (100bps) fall in interest rates → ~" + str(mod_dur) + "% rise in bond price\n\n"
+            "*Provide current market yield for precise duration calculation.*"
+        )
+
+    def _face_value(self):
+        b = self.b
+        return ("## Face Value / Principal\n\n"
+                "| Field | Value |\n|-------|-------|\n"
+                "| **Face Value (per unit)** | **" + self._fmt(b.get("face_value")) + "** |\n"
+                "| **Principal Amount** | " + self._fmt(b.get("principal_amount")) + " |\n"
+                "| **Total Issue Size** | " + self._fmt(b.get("total_issue_size")) + " |\n"
+                "| **Outstanding Amount** | " + self._fmt(b.get("outstanding_amount")) + " |\n"
+                "| **Currency** | " + b.get("issue_currency","INR") + " |")
+
+    def _issue_size(self):
+        b = self.b
+        fv = b.get("face_value",0) or 1
+        total = b.get("total_issue_size",0) or 0
+        units = int(total/fv) if fv else 0
+        return ("## Issue Size\n\n"
+                "| Field | Value |\n|-------|-------|\n"
+                "| **Total Issue Size** | **" + self._fmt(total) + "** |\n"
+                "| **Face Value per Unit** | " + self._fmt(b.get("face_value")) + " |\n"
+                "| **Outstanding Amount** | " + self._fmt(b.get("outstanding_amount")) + " |\n"
+                "| **Number of Units** | " + f"{units:,}" + " |\n"
+                "| **Currency** | " + b.get("issue_currency","INR") + " |")
+
+    def _currency(self):
+        b = self.b
+        return ("## Currency & Denomination\n\n"
+                "- **Issue Currency:** **" + b.get("issue_currency","INR") + "**\n"
+                "- **Market Type:** " + b.get("domestic_foreign","Domestic") + "\n"
+                "- **Settlement:** " + b.get("payment_location","N/A"))
+
+    def _listing(self):
+        b = self.b
+        return ("## Exchange Listing\n\n"
+                "- **Listed On:** **" + b.get("exchange_listing","N/A") + "**\n"
+                "- **SEBI Reg:** " + b.get("sebi_registration","N/A") + "\n"
+                "- **Market Type:** " + b.get("domestic_foreign","N/A"))
+
+    def _legal(self):
+        b = self.b
+        return ("## Legal & Regulatory\n\n"
+                "- **Governing Law:** " + b.get("governing_law","N/A") + "\n"
+                "- **Business Day Convention:** " + b.get("business_day_convention","N/A") + "\n"
+                "- **Payment Location:** " + b.get("payment_location","N/A") + "\n"
+                "- **SEBI Registration:** " + b.get("sebi_registration","N/A"))
+
+    def _security(self):
+        b = self.b
+        s = b.get("security_type","N/A")
+        return ("## Security & Collateral\n\n"
+                "- **Security Type:** **" + s + "**\n\n"
+                + ("This is a **SECURED** bond — backed by specific assets of the issuer, providing additional protection in the event of default."
+                   if s=="Secured" else
+                   "This is an **UNSECURED** bond — bondholders are unsecured creditors. In case of default/insolvency, they rank after secured creditors."))
+
+    def _calculation(self, q):
+        b = self.b
+        fv = b.get("face_value",0) or 0
+        rate = b.get("coupon_rate",0) or 0
+        freq = b.get("coupon_frequency","Semi-Annual")
+        dc = b.get("day_count_convention","Actual/Actual")
+        m = _re.search(r'(\d+)\s*days?', q.lower())
+        days = int(m.group(1)) if m else 182
+        year_days = 360 if "360" in dc else 365
+        calc_days = round(days/365*360) if "30/" in dc else days
+        accrued = float(fv)*float(rate)/100*calc_days/year_days if fv and rate else 0
+        coupon_per_period = (float(fv)*float(rate)/100)/self._ppY(freq) if fv and rate else 0
+        return (
+            "## Calculation — " + b.get("bond_name","") + "\n\n"
+            "**Day Count Convention:** " + dc + "\n"
+            "**Face Value:** " + self._fmt(fv) + " | **Rate:** " + str(rate) + "% p.a.\n\n"
+            "### Accrued Interest for " + str(days) + " days\n"
+            "= " + self._fmt(fv) + " × " + str(rate) + "% × " + str(calc_days) + "/" + str(year_days) + "\n"
+            "= **" + self._fmt(accrued) + "**\n\n"
+            "### Coupon per " + freq + " Payment\n"
+            "= " + self._fmt(fv) + " × " + str(rate) + "% ÷ " + str(self._ppY(freq)) + "\n"
+            "= **" + self._fmt(coupon_per_period) + "**"
+        )
+
+    def _general(self):
+        b = self.b
+        return (
+            "## Bizaxl Bond AI — " + b.get("bond_name","") + "\n\n"
+            "I have full details about this bond. Ask me:\n\n"
+            "| Topic | Sample Question |\n|-------|----------------|\n"
+            "| Coupon | *What is the coupon rate?* |\n"
+            "| Schedule | *Show full coupon schedule* |\n"
+            "| Next Payment | *When is the next payment?* |\n"
+            "| Yield | *Calculate yield to maturity* |\n"
+            "| Risk | *What are the risk factors?* |\n"
+            "| Covenants | *Explain all covenants* |\n"
+            "| ESG | *What is the ESG classification?* |\n"
+            "| Maturity | *When does this bond mature?* |\n"
+            "| Rating | *What is the credit rating?* |\n"
+            "| Calculation | *Calculate accrued interest for 90 days* |\n"
+            "| Duration | *What is the modified duration?* |\n"
+            "| Call Option | *What are the call option terms?* |\n\n"
+            "**Bond:** " + b.get("bond_name","N/A") + " | **ISIN:** " + b.get("isin","N/A") + " | **Maturity:** " + str(b.get("maturity_date","N/A"))
+        )
+
+    def _search_docs(self, question):
+        if not self.doc_text:
+            return None
+        q_words = set(question.lower().split()) - {"what","is","the","a","an","of","in","for","and","or","this","bond","does","how","when","tell","me","about","show"}
+        if not q_words:
+            return None
+        sentences = _re.split(r'[.!\n]', self.doc_text)
+        scored = []
+        for s in sentences:
+            sl = s.lower()
+            score = sum(1 for w in q_words if w in sl)
+            if score > 0 and len(s.strip()) > 20:
+                scored.append((score, s.strip()))
+        scored.sort(reverse=True)
+        top = [s[1] for s in scored[:4]]
+        if top:
+            src = ("\n\n*Source: " + ", ".join(self.doc_names) + "*") if self.doc_names else ""
+            return "## From Uploaded Documents\n\n" + "\n\n".join(top) + src
+        return None
+
+    def _extract_section(self, kw, max_c):
+        if not self.doc_text:
+            return ""
+        pat = _re.compile(r'(?i)(?:^|\n)([^\n]*(?:' + kw + r')[^\n]*(?:\n(?![A-Z])[^\n]*)*)', _re.MULTILINE)
+        matches = pat.findall(self.doc_text)
+        return " ".join(matches)[:max_c].strip()
+
+    def _fmt(self, n):
+        if n is None or n == "":
+            return "N/A"
         try:
-            doc.processing_status = "Failed"
-            doc.save(ignore_permissions=True)
-            frappe.db.commit()
+            n = float(n)
         except Exception:
-            pass
-        return {"status": "error", "message": str(e)}
+            return str(n)
+        if n >= 10000000:
+            return "₹" + str(round(n/10000000,2)) + "Cr"
+        if n >= 100000:
+            return "₹" + str(round(n/100000,1)) + "L"
+        return "₹" + f"{n:,.0f}"
+
+    def _ppY(self, freq):
+        return {"Annual":1,"Semi-Annual":2,"Quarterly":4,"Monthly":12,"At Maturity":1}.get(freq,2)
 
 
 @frappe.whitelist(allow_guest=True)
 def ask_bond_ai(bond_name, question, session_id=None):
+    """
+    Bizaxl Built-in Bond AI — completely self-contained, no external API key needed.
+    Analyzes bond data from the database and uploaded documents.
+    """
     try:
-        import requests
-        settings = _get_settings()
-        api_key = settings.claude_api_key or ""
+        # Load bond details
+        bonds = frappe.get_all("Bond Master", filters={"name": bond_name}, fields=["*"], limit=1)
+        bond = bonds[0] if bonds else {}
 
+        # Load schedules
+        coupons = frappe.get_all("Bond Coupon Schedule", filters={"bond_name": bond_name}, fields=["*"], order_by="coupon_number asc", limit=50)
+        steps = frappe.get_all("Bond Step Schedule", filters={"bond_name": bond_name}, fields=["*"], order_by="period_from asc")
+        amort = frappe.get_all("Bond Amortization Schedule", filters={"bond_name": bond_name}, fields=["*"], order_by="payment_number asc", limit=30)
+
+        # Load processed documents
         docs = frappe.get_all(
             "Bond Document",
             filters={"bond_name": bond_name, "processing_status": "Ready"},
-            fields=["extracted_text", "key_terms_json", "document_summary", "document_name", "document_type"],
-            order_by="document_date desc"
+            fields=["document_name", "document_type", "extracted_text", "document_summary", "key_terms_json"],
+            order_by="modified desc", limit=3
         )
 
-        if not docs:
-            return {
-                "answer": "No processed documents found for this bond. Please upload and process the bond prospectus first.",
-                "sources": [],
-                "session_id": session_id or ""
-            }
-
-        context_parts = []
-        for doc in docs[:3]:
-            if doc.get("extracted_text"):
-                context_parts.append(
-                    f"[{doc['document_type']} — {doc['document_name']}]\n{doc['extracted_text'][:15000]}"
-                )
-            elif doc.get("document_summary"):
-                context_parts.append(
-                    f"[Summary — {doc['document_name']}]\n{doc['document_summary']}"
-                )
-        context = "\n\n---\n\n".join(context_parts)
-
-        bond = frappe.get_all(
-            "Bond Master",
-            filters={"name": bond_name},
-            fields=[
-                "bond_name", "isin", "issuer_name", "coupon_rate", "coupon_type",
-                "coupon_frequency", "maturity_date", "issue_date", "principal_amount",
-                "issue_currency", "credit_rating", "esg_classification", "bond_type",
-                "day_count_convention", "face_value", "coupon_type"
-            ]
-        )
-        bond_meta = json.dumps(bond[0] if bond else {}, default=str)
-
-        system_prompt = f"""You are an expert Bond Analyst AI assistant for Bizaxl Securities.
-You have deep knowledge of fixed income markets, bond structures, coupon calculations,
-ESG bond frameworks, SEBI regulations, and bond documentation.
-
-You are answering questions about a SPECIFIC BOND. Use ONLY the provided bond documents
-and metadata to answer. Be precise, cite specific sections/pages when possible.
-If information is not in the documents, say so clearly.
-
-Bond Metadata: {bond_meta}
-
-Bond Documents Context:
-{context}
-
-Answer in clear, professional language. For calculations, show the formula used.
-For coupon calculations use the day count convention specified in the bond terms.
-Format answers clearly with sections when needed."""
-
-        response = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01"
-            },
-            json={
-                "model": settings.ai_model or "claude-sonnet-4-20250514",
-                "max_tokens": int(settings.max_tokens_per_query or 2000),
-                "system": system_prompt,
-                "messages": [{"role": "user", "content": question}]
-            },
-            timeout=60
-        )
-
-        data = response.json()
-        answer = data.get("content", [{}])[0].get("text", "Unable to process your question.")
-        tokens = data.get("usage", {}).get("output_tokens", 0)
-
-        if not session_id:
-            session_id = f"SESSION-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-
-        chat = frappe.get_doc({
-            "doctype": "Bond AI Chat",
-            "bond_name": bond_name,
-            "session_id": session_id,
-            "question": question,
-            "answer": answer,
-            "model_used": settings.ai_model or "claude-sonnet-4-20250514",
-            "tokens_used": tokens,
-            "asked_by": frappe.session.user,
-            "asked_on": datetime.datetime.now()
-        })
-        chat.insert(ignore_permissions=True)
-        frappe.db.commit()
-
-        return {
-            "answer": answer,
-            "session_id": session_id,
-            "sources": [d["document_name"] for d in docs]
-        }
-    except Exception as e:
-        frappe.log_error(str(e), "ask_bond_ai")
-        return {"answer": f"Error processing question: {str(e)}", "sources": [], "session_id": session_id or ""}
-
-
-@frappe.whitelist(allow_guest=True)
-def get_ai_chat_history(bond_name, session_id=None):
-    try:
-        filters = {"bond_name": bond_name}
-        if session_id:
-            filters["session_id"] = session_id
-        return frappe.get_all(
-            "Bond AI Chat",
-            filters=filters,
-            fields=["question", "answer", "session_id", "asked_on", "model_used", "tokens_used", "feedback"],
-            order_by="asked_on asc",
-            limit=50
-        )
-    except Exception as e:
-        frappe.log_error(str(e), "get_ai_chat_history")
-        return []
-
-
-@frappe.whitelist(allow_guest=True)
-def get_bond_documents(bond_name):
-    try:
-        return frappe.get_all(
-            "Bond Document",
-            filters={"bond_name": bond_name},
-            fields=["name", "document_name", "document_type", "document_date", "processing_status", "total_pages", "document_summary"],
-            order_by="document_date desc"
-        )
-    except Exception as e:
-        frappe.log_error(str(e), "get_bond_documents")
-        return []
-
-
-@frappe.whitelist(allow_guest=True)
-def get_esg_bonds():
-    try:
-        return frappe.get_all(
-            "Bond Master",
-            filters={"esg_classification": ["!=", "None"]},
-            fields=["name", "bond_name", "isin", "issuer_name", "esg_classification", "use_of_proceeds", "issue_currency", "principal_amount", "credit_rating"],
-            order_by="creation desc"
-        )
-    except Exception as e:
-        frappe.log_error(str(e), "get_esg_bonds")
-        return []
-
-
-@frappe.whitelist(allow_guest=True)
-def get_esg_reports():
-    try:
-        return frappe.get_all(
-            "Bond ESG Report",
-            fields=["*"],
-            order_by="report_date desc"
-        )
-    except Exception as e:
-        frappe.log_error(str(e), "get_esg_reports")
-        return []
-
-
-@frappe.whitelist(allow_guest=True)
-def ask_bond_ai_v2(bond_name, question, session_id=None):
-    """Improved ask_bond_ai with better error handling and api key check."""
-    try:
-        import requests
-        settings = _get_settings()
-        api_key = settings.claude_api_key or ""
-
-        # Clear API key check
-        if not api_key or len(api_key.strip()) < 20:
-            return {
-                "answer": "⚠️ Claude API Key not configured. Please go to **Settings** → enter your Claude API Key (starts with `sk-ant-...`) and click Save. Then come back here to ask questions.",
-                "sources": [],
-                "session_id": session_id or ""
-            }
-
-        # Get documents - try both bond_name and name filters
-        docs = frappe.get_all(
-            "Bond Document",
-            filters={"processing_status": "Ready"},
-            fields=["extracted_text", "key_terms_json", "document_summary", "document_name", "document_type", "bond_name"],
-            order_by="modified desc",
-            limit=10
-        )
-        # Filter by bond_name flexibly
-        bond_docs = [d for d in docs if d.get("bond_name") == bond_name or d.get("bond_name") in bond_name or bond_name in (d.get("bond_name") or "")]
-        if not bond_docs and docs:
-            bond_docs = docs[:3]  # fallback to latest docs
-
-        if not bond_docs:
-            return {
-                "answer": "📄 No processed documents found. Please upload the bond prospectus/document using the panel on the right, then click **Process with AI**. Once processed, I can answer any question about this bond.",
-                "sources": [],
-                "session_id": session_id or ""
-            }
-
-        # Build context
-        context_parts = []
-        for doc in bond_docs[:3]:
-            text = doc.get("extracted_text") or doc.get("document_summary") or ""
-            if text:
-                context_parts.append(f"[{doc.get('document_type','Document')} — {doc.get('document_name','Unknown')}]\n{text[:18000]}")
-        context = "\n\n---\n\n".join(context_parts)
-
-        # Get bond metadata
-        bond_list = frappe.get_all(
-            "Bond Master",
-            filters=[["name", "like", f"%{bond_name}%"]],
-            fields=["bond_name", "isin", "issuer_name", "coupon_rate", "coupon_type",
-                    "coupon_frequency", "maturity_date", "issue_date", "principal_amount",
-                    "issue_currency", "credit_rating", "esg_classification", "bond_type",
-                    "day_count_convention", "face_value", "governing_law"],
-            limit=1
-        )
-        if not bond_list:
-            bond_list = frappe.get_all("Bond Master", fields=["bond_name", "isin", "issuer_name"], limit=1)
-        bond_meta = json.dumps(bond_list[0] if bond_list else {}, default=str)
-
-        system_prompt = f"""You are an expert Bond Analyst AI for Bizaxl Securities with deep knowledge of:
-- Fixed income markets, bond pricing, yield calculations
-- Coupon structures (fixed, floating, step-up, zero coupon)
-- Day count conventions (Actual/Actual, 30/360, Actual/365)
-- ESG bond frameworks (Green, Social, Sustainability, Climate)
-- SEBI regulations and Indian bond markets
-- Bond documentation (prospectus, information memorandum, term sheets)
-
-You are analyzing a SPECIFIC BOND. Answer ONLY from the provided documents.
-Be precise, professional, and show calculations when asked.
-
-Bond Details: {bond_meta}
-
-Document Context:
-{context}
-
-Rules:
-- Show formulas for all calculations
-- Cite document sections when possible
-- If data not in documents, say so clearly
-- For coupon calculations, use the bond's day count convention"""
-
-        resp = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": api_key.strip(),
-                "anthropic-version": "2023-06-01"
-            },
-            json={
-                "model": settings.ai_model or "claude-sonnet-4-20250514",
-                "max_tokens": int(settings.max_tokens_per_query or 2000),
-                "system": system_prompt,
-                "messages": [{"role": "user", "content": question}]
-            },
-            timeout=90
-        )
-
-        data = resp.json()
-
-        # Handle API errors explicitly
-        if resp.status_code != 200:
-            err_type = data.get("error", {}).get("type", "unknown")
-            err_msg = data.get("error", {}).get("message", "Unknown error")
-            if err_type == "authentication_error":
-                return {"answer": f"❌ Invalid Claude API Key. Please check your API key in Settings. It should start with `sk-ant-api03-...`\n\nError: {err_msg}", "sources": [], "session_id": session_id or ""}
-            return {"answer": f"❌ Claude API Error ({resp.status_code}): {err_msg}", "sources": [], "session_id": session_id or ""}
-
-        content_blocks = data.get("content", [])
-        answer = ""
-        for block in content_blocks:
-            if block.get("type") == "text":
-                answer += block.get("text", "")
-
-        if not answer:
-            answer = "I received an empty response. Please try again."
-
-        tokens = data.get("usage", {}).get("output_tokens", 0)
-
-        if not session_id:
-            session_id = f"SESSION-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-
-        try:
-            chat = frappe.get_doc({
-                "doctype": "Bond AI Chat",
-                "bond_name": bond_name,
-                "session_id": session_id,
-                "question": question,
-                "answer": answer,
-                "model_used": settings.ai_model or "claude-sonnet-4-20250514",
-                "tokens_used": tokens,
-                "asked_by": frappe.session.user,
-                "asked_on": datetime.datetime.now()
-            })
-            chat.insert(ignore_permissions=True)
-            frappe.db.commit()
-        except Exception:
-            pass
-
-        return {
-            "answer": answer,
-            "session_id": session_id,
-            "sources": [d.get("document_name", "") for d in bond_docs]
-        }
-
-    except Exception as e:
-        frappe.log_error(str(e), "ask_bond_ai_v2")
-        return {
-            "answer": f"❌ Error: {str(e)}\n\nPlease check:\n1. Claude API Key is set in Settings\n2. Internet connection is available\n3. The bond document has been processed",
-            "sources": [],
-            "session_id": session_id or ""
-        }
-
-
-@frappe.whitelist(allow_guest=True)
-def extract_bond_from_document(file_url=None, file_content=None, document_name=None):
-    """
-    Upload a bond document (prospectus/term sheet) and AI auto-extracts
-    all bond fields to pre-fill the Add Bond form.
-    Returns a dict with all bond fields ready to populate the form.
-    """
-    try:
-        import requests
-        settings = _get_settings()
-        api_key = settings.claude_api_key or ""
-
-        if not api_key or len(api_key.strip()) < 20:
-            return {
-                "status": "error",
-                "message": "Claude API Key not configured. Please set it in Settings first."
-            }
-
-        # Read file content
-        extracted_text = ""
-        if file_url:
-            try:
-                file_docs = frappe.get_all("File", filters={"file_url": file_url}, fields=["name", "file_url"])
-                if file_docs:
-                    file_path = frappe.get_site_path() + file_url
-                    with open(file_path, 'rb') as f:
-                        content = f.read()
-                    try:
-                        extracted_text = content.decode('utf-8', errors='ignore')
-                    except Exception:
-                        extracted_text = str(content)
-            except Exception as fe:
-                extracted_text = f"Could not read file: {str(fe)}"
-
-        if not extracted_text:
-            return {"status": "error", "message": "Could not read the uploaded file. Please try a text-based PDF or .txt file."}
-
-        # Build extraction prompt
-        prompt = f"""You are a bond document parser. Extract ALL bond details from this document.
-
-Document: {document_name or 'Bond Document'}
-
-Content:
-{extracted_text[:45000]}
-
-Extract and return ONLY a valid JSON object with these exact keys (use null if not found):
-{{
-  "bond_name": "Full bond name",
-  "isin": "12-character ISIN code",
-  "cusip": "CUSIP if available",
-  "issuer_name": "Name of the bond issuer",
-  "issuer_type": "Corporate|Central Government|State Government|Municipal|Financial Institution|NBFC|PSU",
-  "issue_date": "YYYY-MM-DD",
-  "maturity_date": "YYYY-MM-DD",
-  "tenor_years": 10,
-  "principal_amount": 1000000,
-  "face_value": 1000,
-  "issue_currency": "INR|USD|EUR|GBP",
-  "total_issue_size": 5000000000,
-  "coupon_type": "Fixed|Floating|Zero Coupon|Step-Up|Step-Down|Variable|Index Linked",
-  "coupon_rate": 8.5,
-  "benchmark_rate": "SOFR|LIBOR|EURIBOR|MIBOR|NA",
-  "spread_bps": 0,
-  "coupon_frequency": "Annual|Semi-Annual|Quarterly|Monthly|At Maturity|Zero",
-  "first_coupon_date": "YYYY-MM-DD",
-  "day_count_convention": "Actual/Actual|Actual/360|Actual/365|30/360|30/365",
-  "business_day_convention": "Following|Modified Following|Preceding",
-  "governing_law": "Indian Law|UK English Law|New York Law|German Law|French Law|Other",
-  "exchange_listing": "NSE|BSE|NSE+BSE|Luxembourg|Dublin|Singapore|OTC|Unlisted",
-  "credit_rating": "AAA|AA+|AA|AA-|A+|A|BBB+|BBB|BB+|BB|B|sovereign",
-  "credit_rating_agency": "CRISIL|ICRA|CARE|India Ratings|S&P|Moody's|Fitch",
-  "rating_outlook": "Stable|Positive|Negative|Watch",
-  "bond_type": "Corporate Bond|Government Bond|Zero Coupon|Convertible|Exchangeable|Amortizing|Inflation Indexed|Junk/High Yield|Callable|Puttable|Perpetual",
-  "security_type": "Secured|Unsecured",
-  "domestic_foreign": "Domestic|Foreign|Eurobond|Global|International",
-  "esg_classification": "None|Green Bond|Blue Bond|Social Bond|Sustainability Bond|Gender Equality Bond|Climate Bond|Pandemic Bond|Transition Bond",
-  "use_of_proceeds": "Description of use of proceeds",
-  "is_callable": 0,
-  "call_date": "YYYY-MM-DD or null",
-  "call_price": null,
-  "is_puttable": 0,
-  "put_date": null,
-  "put_price": null,
-  "is_convertible": 0,
-  "is_amortizing": 0,
-  "sebi_registration": "SEBI reg number if any",
-  "payment_location": "Mumbai|London|New York",
-  "remarks": "Any important notes about this bond"
-}}
-
-Return ONLY the JSON, no other text."""
-
-        resp = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": api_key.strip(),
-                "anthropic-version": "2023-06-01"
-            },
-            json={
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 3000,
-                "messages": [{"role": "user", "content": prompt}]
-            },
-            timeout=120
-        )
-
-        if resp.status_code != 200:
-            err = resp.json().get("error", {}).get("message", "API error")
-            return {"status": "error", "message": f"Claude API error: {err}"}
-
-        data = resp.json()
-        ai_text = ""
-        for block in data.get("content", []):
-            if block.get("type") == "text":
-                ai_text += block.get("text", "")
-
-        # Parse JSON from response
-        try:
-            clean = ai_text.strip()
-            if "```json" in clean:
-                clean = clean.split("```json")[1].split("```")[0].strip()
-            elif "```" in clean:
-                clean = clean.split("```")[1].split("```")[0].strip()
-            bond_fields = json.loads(clean)
-        except Exception as pe:
-            return {"status": "error", "message": f"Could not parse AI response: {str(pe)}", "raw": ai_text[:500]}
-
-        return {
-            "status": "success",
-            "bond_fields": bond_fields,
-            "message": f"Successfully extracted bond details from {document_name or 'document'}"
-        }
-
-    except Exception as e:
-        frappe.log_error(str(e), "extract_bond_from_document")
-        return {"status": "error", "message": str(e)}
-
-
-@frappe.whitelist(allow_guest=True)
-def save_ai_chat(bond_name, session_id, question, answer):
-    """Save AI chat history to Bond AI Chat doctype."""
-    try:
-        chat = frappe.get_doc({
-            "doctype": "Bond AI Chat",
-            "bond_name": bond_name,
-            "session_id": session_id,
-            "question": question,
-            "answer": answer,
-            "model_used": "claude-sonnet-4-20250514",
-            "asked_by": frappe.session.user,
-            "asked_on": datetime.datetime.now()
-        })
-        chat.insert(ignore_permissions=True)
-        frappe.db.commit()
-        return {"status": "success"}
-    except Exception as e:
-        frappe.log_error(str(e), "save_ai_chat")
-        return {"status": "error"}
-
-
-# ─── BUILT-IN BOND AI (NO USER API KEY NEEDED) ───────────────────────────────
-# This endpoint acts as a proxy — the app calls Anthropic on behalf of the user.
-# Users never need to configure any API key.
-
-def _call_claude(system_prompt, user_message, max_tokens=2000):
-    """Internal helper to call Claude API. App provides its own access."""
-    import requests as _req
-    import os
-
-    # Try multiple sources for the API key (app-level, not user-level)
-    api_key = (
-        os.environ.get("ANTHROPIC_API_KEY") or
-        os.environ.get("CLAUDE_API_KEY") or
-        frappe.conf.get("anthropic_api_key") or
-        ""
-    )
-
-    # If no env key, try the Settings (user may have put it there)
-    if not api_key:
-        try:
-            s = frappe.get_single("Bond Settings")
-            api_key = s.claude_api_key or ""
-        except Exception:
-            pass
-
-    if not api_key:
-        return {
-            "success": False,
-            "answer": "🔧 The Bond AI needs to be configured by the administrator.\n\nPlease ask your system admin to set the `ANTHROPIC_API_KEY` environment variable on the server, or enter it once in Bond Settings.",
-            "error": "no_key"
-        }
-
-    try:
-        resp = _req.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": api_key.strip(),
-                "anthropic-version": "2023-06-01"
-            },
-            json={
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": max_tokens,
-                "system": system_prompt,
-                "messages": [{"role": "user", "content": user_message}]
-            },
-            timeout=90
-        )
-        data = resp.json()
-
-        if resp.status_code == 200:
-            text = ""
-            for block in data.get("content", []):
-                if block.get("type") == "text":
-                    text += block.get("text", "")
-            return {"success": True, "answer": text, "tokens": data.get("usage", {}).get("output_tokens", 0)}
-        else:
-            err = data.get("error", {}).get("message", f"HTTP {resp.status_code}")
-            return {"success": False, "answer": f"AI Error: {err}", "error": err}
-    except Exception as e:
-        return {"success": False, "answer": f"Connection error: {str(e)}", "error": str(e)}
-
-
-@frappe.whitelist(allow_guest=True)
-def bond_ai_chat(bond_name, question, session_id=None):
-    """
-    Built-in Bond AI — no user API key needed.
-    Loads bond data + documents from DB, calls Claude, returns answer.
-    """
-    try:
-        # ── Load bond data from DB ──────────────────────────────────────────
-        bond_info = ""
-        coupon_info = ""
-        doc_context = ""
-        sources = []
-
-        # Bond master details
-        bonds = frappe.get_all(
-            "Bond Master",
-            filters=[["name", "=", bond_name]],
-            fields=["*"],
-            limit=1
-        )
-        if bonds:
-            b = bonds[0]
-            bond_info = f"""BOND DETAILS:
-Name: {b.get('bond_name', '')}
-ISIN: {b.get('isin', 'N/A')}
-Issuer: {b.get('issuer_name', 'N/A')} ({b.get('issuer_type', '')})
-Bond Type: {b.get('bond_type', 'N/A')}
-Coupon Type: {b.get('coupon_type', 'N/A')}
-Coupon Rate: {b.get('coupon_rate', 0)}% p.a.
-Benchmark Rate: {b.get('benchmark_rate', 'NA')}
-Spread (bps): {b.get('spread_bps', 0)}
-Coupon Frequency: {b.get('coupon_frequency', 'N/A')}
-First Coupon Date: {b.get('first_coupon_date', 'N/A')}
-Penultimate Date: {b.get('penultimate_date', 'N/A')}
-Issue Date: {b.get('issue_date', 'N/A')}
-Maturity Date: {b.get('maturity_date', 'N/A')}
-Tenor: {b.get('tenor_years', 'N/A')} years
-Face Value: {b.get('face_value', 'N/A')}
-Principal Amount: {b.get('principal_amount', 'N/A')}
-Total Issue Size: {b.get('total_issue_size', 'N/A')}
-Outstanding Amount: {b.get('outstanding_amount', 'N/A')}
-Currency: {b.get('issue_currency', 'INR')}
-Credit Rating: {b.get('credit_rating', 'N/A')} ({b.get('credit_rating_agency', 'N/A')}) — {b.get('rating_outlook', 'N/A')}
-Day Count Convention: {b.get('day_count_convention', 'N/A')}
-Business Day Convention: {b.get('business_day_convention', 'N/A')}
-Exchange Listing: {b.get('exchange_listing', 'N/A')}
-Governing Law: {b.get('governing_law', 'N/A')}
-Security Type: {b.get('security_type', 'N/A')}
-Domestic/Foreign: {b.get('domestic_foreign', 'N/A')}
-ESG Classification: {b.get('esg_classification', 'None')}
-Use of Proceeds: {b.get('use_of_proceeds', 'N/A')}
-Is Callable: {'Yes — Call Date: ' + str(b.get('call_date','')) + ' Price: ' + str(b.get('call_price','')) if b.get('is_callable') else 'No'}
-Is Puttable: {'Yes — Put Date: ' + str(b.get('put_date','')) + ' Price: ' + str(b.get('put_price','')) if b.get('is_puttable') else 'No'}
-Is Convertible: {'Yes — Ratio: ' + str(b.get('conversion_ratio','')) + ' Price: ' + str(b.get('conversion_price','')) if b.get('is_convertible') else 'No'}
-Is Amortizing: {'Yes' if b.get('is_amortizing') else 'No'}
-Payment Location: {b.get('payment_location', 'N/A')}
-SEBI Registration: {b.get('sebi_registration', 'N/A')}
-Remarks: {b.get('remarks', '')}"""
-
-        # Coupon schedule
-        coupons = frappe.get_all(
-            "Bond Coupon Schedule",
-            filters={"bond_name": bond_name},
-            fields=["*"],
-            order_by="coupon_number asc",
-            limit=40
-        )
-        if coupons:
-            coupon_info = "\nCOUPON SCHEDULE:\n"
-            for c in coupons:
-                coupon_info += (
-                    f"{c.get('coupon_number','?')}. "
-                    f"Date: {c.get('coupon_date','?')} | "
-                    f"Rate: {c.get('coupon_rate_applicable',0)}% | "
-                    f"Amount/Unit: {c.get('coupon_amount_per_unit',0)} | "
-                    f"Total: {c.get('total_coupon_amount',0)} | "
-                    f"Days: {c.get('day_count_days','')} | "
-                    f"Status: {c.get('status','Upcoming')}\n"
-                )
-
-        # Amortization schedule
-        amort = frappe.get_all(
-            "Bond Amortization Schedule",
-            filters={"bond_name": bond_name},
-            fields=["*"],
-            order_by="payment_number asc",
-            limit=30
-        )
-        if amort:
-            coupon_info += "\nAMORTIZATION SCHEDULE:\n"
-            for a in amort:
-                coupon_info += (
-                    f"{a.get('payment_number','?')}. "
-                    f"Date: {a.get('payment_date','?')} | "
-                    f"Opening: {a.get('opening_principal',0)} | "
-                    f"Coupon: {a.get('coupon_payment',0)} | "
-                    f"Principal: {a.get('principal_payment',0)} | "
-                    f"Closing: {a.get('closing_principal',0)}\n"
-                )
-
-        # Step schedule (for step-up/step-down bonds)
-        steps = frappe.get_all(
-            "Bond Step Schedule",
-            filters={"bond_name": bond_name},
-            fields=["*"],
-            order_by="period_from asc"
-        )
-        if steps:
-            coupon_info += "\nSTEP SCHEDULE:\n"
-            for s in steps:
-                coupon_info += (
-                    f"Period: {s.get('period_from','')} to {s.get('period_to','')} | "
-                    f"Rate: {s.get('coupon_rate',0)}% | "
-                    f"Type: {s.get('rate_type','')} | "
-                    f"Benchmark: {s.get('benchmark','')} | "
-                    f"Spread: {s.get('spread_bps',0)}bps\n"
-                )
-
-        # Uploaded documents (processed)
-        docs = frappe.get_all(
-            "Bond Document",
-            filters={"bond_name": bond_name, "processing_status": "Ready"},
-            fields=["document_name", "document_type", "document_summary", "key_terms_json", "extracted_text"],
-            order_by="modified desc",
-            limit=3
-        )
-        for doc in docs:
-            sources.append(doc.get("document_name", ""))
-            text = doc.get("extracted_text") or doc.get("document_summary") or ""
-            if text:
-                doc_context += f"\n[{doc.get('document_type','Document')}: {doc.get('document_name','')}]\n{text[:12000]}\n"
-            if doc.get("key_terms_json"):
-                try:
-                    kt = json.loads(doc["key_terms_json"])
-                    doc_context += f"Key Terms: {json.dumps(kt, indent=2)[:2000]}\n"
-                except Exception:
-                    pass
-
-        # ── Build system prompt ─────────────────────────────────────────────
-        system_prompt = f"""You are the Bizaxl Bond AI — a built-in expert bond analyst for the Bizaxl Securities bond management platform.
-
-You have deep expertise in:
-- Fixed income markets and bond pricing
-- Coupon calculations (fixed, floating, step-up, zero coupon, amortizing)
-- Day count conventions (Actual/Actual, 30/360, Actual/365, Actual/360)
-- Yield to maturity, yield to call, duration, convexity
-- ESG bond frameworks (Green, Blue, Social, Sustainability, Climate)
-- SEBI regulations and Indian bond markets
-- Bond documentation (prospectus, IM, term sheets, covenants)
-
-You are answering questions about this SPECIFIC BOND. Use ONLY the data below.
-Show all formulas and step-by-step calculations when asked.
-Be professional, precise, and helpful.
-
-{bond_info}
-{coupon_info}
-{doc_context if doc_context else ''}"""
-
-        # ── Call Claude ─────────────────────────────────────────────────────
-        result = _call_claude(system_prompt, question, max_tokens=2000)
-
-        # ── Save to chat history ────────────────────────────────────────────
-        if not session_id:
-            session_id = f"SESSION-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-
-        if result.get("success"):
-            try:
-                chat = frappe.get_doc({
-                    "doctype": "Bond AI Chat",
-                    "bond_name": bond_name,
-                    "session_id": session_id,
-                    "question": question,
-                    "answer": result["answer"],
-                    "model_used": "claude-sonnet-4-20250514",
-                    "tokens_used": result.get("tokens", 0),
-                    "asked_by": frappe.session.user,
-                    "asked_on": datetime.datetime.now(),
-                    "sources_cited": ", ".join(sources)
-                })
-                chat.insert(ignore_permissions=True)
-                frappe.db.commit()
-            except Exception:
-                pass
-
-        return {
-            "answer": result.get("answer", "Unable to process"),
-            "session_id": session_id,
-            "sources": sources,
-            "success": result.get("success", False)
-        }
-
-    except Exception as e:
-        frappe.log_error(str(e), "bond_ai_chat")
-        return {
-            "answer": f"Error: {str(e)}",
-            "session_id": session_id or "",
-            "sources": [],
-            "success": False
-        }
-
-
-@frappe.whitelist(allow_guest=True)
-def bond_ai_extract(file_url, document_name="Bond Document"):
-    """
-    Built-in document extraction — reads uploaded file and extracts all bond fields.
-    No user API key needed.
-    """
-    try:
-        extracted_text = ""
-        if file_url:
-            try:
-                file_path = frappe.get_site_path() + file_url
-                with open(file_path, 'rb') as f:
-                    content = f.read()
-                extracted_text = content.decode('utf-8', errors='ignore')
-            except Exception as fe:
-                return {"status": "error", "message": f"Cannot read file: {str(fe)}"}
-
-        if not extracted_text:
-            return {"status": "error", "message": "File is empty or unreadable. Please use a text-based PDF or .txt file."}
-
-        prompt = f"""Extract ALL bond details from this document. Return ONLY valid JSON.
-
-Document: {document_name}
-Content:
-{extracted_text[:45000]}
-
-Return this exact JSON structure (null for missing fields):
-{{
-  "bond_name": "Full official bond name",
-  "isin": "12-char ISIN code",
-  "issuer_name": "Issuer name",
-  "issuer_type": "Corporate|Central Government|State Government|Municipal|Financial Institution|NBFC|PSU",
-  "issue_date": "YYYY-MM-DD",
-  "maturity_date": "YYYY-MM-DD",
-  "tenor_years": 10,
-  "principal_amount": 1000000,
-  "face_value": 1000,
-  "issue_currency": "INR",
-  "total_issue_size": 5000000000,
-  "coupon_type": "Fixed|Floating|Zero Coupon|Step-Up|Step-Down|Variable",
-  "coupon_rate": 8.5,
-  "coupon_frequency": "Annual|Semi-Annual|Quarterly|Monthly|At Maturity",
-  "first_coupon_date": "YYYY-MM-DD",
-  "credit_rating": "AAA",
-  "credit_rating_agency": "CRISIL|ICRA|CARE|India Ratings|S&P|Moody's|Fitch",
-  "rating_outlook": "Stable|Positive|Negative|Watch",
-  "bond_type": "Corporate Bond|Government Bond|Zero Coupon|Convertible|Amortizing|Callable|Puttable",
-  "security_type": "Secured|Unsecured",
-  "esg_classification": "None|Green Bond|Blue Bond|Social Bond|Sustainability Bond|Climate Bond",
-  "day_count_convention": "Actual/Actual|Actual/360|Actual/365|30/360",
-  "governing_law": "Indian Law|UK English Law|New York Law",
-  "exchange_listing": "NSE|BSE|NSE+BSE|OTC|Unlisted",
-  "use_of_proceeds": "Description of use",
-  "is_callable": 0,
-  "call_date": null,
-  "call_price": null,
-  "is_puttable": 0,
-  "is_convertible": 0,
-  "is_amortizing": 0,
-  "sebi_registration": null,
-  "remarks": "Key notes"
-}}"""
-
-        result = _call_claude(
-            "You are a bond document parser. Extract bond data and return only valid JSON.",
-            prompt,
-            max_tokens=3000
-        )
-
-        if not result.get("success"):
-            return {"status": "error", "message": result.get("answer", "AI extraction failed")}
-
-        ai_text = result["answer"].strip()
-        if "```json" in ai_text:
-            ai_text = ai_text.split("```json")[1].split("```")[0].strip()
-        elif "```" in ai_text:
-            ai_text = ai_text.split("```")[1].split("```")[0].strip()
-
-        try:
-            bond_fields = json.loads(ai_text)
-            return {"status": "success", "bond_fields": bond_fields, "message": f"Extracted from {document_name}"}
-        except Exception as pe:
-            return {"status": "error", "message": f"Could not parse response: {str(pe)}", "raw": ai_text[:300]}
-
-    except Exception as e:
-        frappe.log_error(str(e), "bond_ai_extract")
-        return {"status": "error", "message": str(e)}
-
-
-# ─── BIZAXL OWN BOND AI (ZERO EXTERNAL DEPENDENCY) ───────────────────────────
-
-@frappe.whitelist(allow_guest=True)
-def bizaxl_bond_ai(bond_name, question, session_id=None):
-    """
-    Bizaxl's own built-in Bond AI Engine.
-    No API keys. No external services. Works entirely from your database.
-    """
-    try:
-        from bond_app.bond_engine import BondAIEngine
-
-        # ── Load all bond data from DB ──────────────────────────────────────
-        # Bond master
-        bonds = frappe.get_all(
-            "Bond Master",
-            filters=[["name", "=", bond_name]],
-            fields=["*"],
-            limit=1
-        )
-        bond_data = bonds[0] if bonds else {}
-
-        # Coupon schedule
-        coupons = frappe.get_all(
-            "Bond Coupon Schedule",
-            filters={"bond_name": bond_name},
-            fields=["*"],
-            order_by="coupon_number asc",
-            limit=50
-        )
-
-        # Step schedule
-        steps = frappe.get_all(
-            "Bond Step Schedule",
-            filters={"bond_name": bond_name},
-            fields=["*"],
-            order_by="period_from asc"
-        )
-
-        # Amortization schedule
-        amort = frappe.get_all(
-            "Bond Amortization Schedule",
-            filters={"bond_name": bond_name},
-            fields=["*"],
-            order_by="payment_number asc",
-            limit=50
-        )
-
-        # Uploaded documents (processed)
-        docs = frappe.get_all(
-            "Bond Document",
-            filters={"bond_name": bond_name},
-            fields=["document_name", "document_type", "processing_status",
-                    "extracted_text", "document_summary", "key_terms_json"],
-            order_by="modified desc",
-            limit=5
-        )
-        sources = [d.get("document_name", "") for d in docs if d.get("processing_status") == "Ready"]
-
-        # ── Run the engine ──────────────────────────────────────────────────
-        engine = BondAIEngine(
-            bond_data=dict(bond_data),
-            coupon_schedule=[dict(c) for c in coupons],
-            step_schedule=[dict(s) for s in steps],
-            amort_schedule=[dict(a) for a in amort],
-            documents=[dict(d) for d in docs]
-        )
+        # Run the engine
+        engine = _BondEngine(bond, coupons, steps, amort, docs)
         answer = engine.answer(question)
 
-        # ── Save to chat history ────────────────────────────────────────────
+        # Save to chat history
         if not session_id:
-            session_id = f"SESSION-{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+            session_id = "SESSION-" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 
         try:
             chat = frappe.get_doc({
@@ -1505,11 +1282,11 @@ def bizaxl_bond_ai(bond_name, question, session_id=None):
                 "session_id": session_id,
                 "question": question,
                 "answer": answer,
-                "model_used": "Bizaxl-Bond-AI-v1",
+                "model_used": "Bizaxl Bond AI Engine v1",
                 "tokens_used": 0,
                 "asked_by": frappe.session.user,
                 "asked_on": datetime.datetime.now(),
-                "sources_cited": ", ".join(sources)
+                "sources_cited": ", ".join([d.get("document_name","") for d in docs])
             })
             chat.insert(ignore_permissions=True)
             frappe.db.commit()
@@ -1519,272 +1296,354 @@ def bizaxl_bond_ai(bond_name, question, session_id=None):
         return {
             "answer": answer,
             "session_id": session_id,
-            "sources": sources,
-            "success": True,
-            "engine": "Bizaxl Bond AI v1"
+            "sources": [d.get("document_name","") for d in docs],
+            "success": True
         }
 
     except Exception as e:
-        frappe.log_error(str(e), "bizaxl_bond_ai")
-        return {
-            "answer": f"Error: {str(e)}",
-            "session_id": session_id or "",
-            "sources": [],
-            "success": False
-        }
+        frappe.log_error(str(e), "ask_bond_ai")
+        return {"answer": "Error: " + str(e), "session_id": session_id or "", "sources": [], "success": False}
 
 
 @frappe.whitelist(allow_guest=True)
-def bizaxl_bond_extract(file_url, document_name="Bond Document"):
+def extract_bond_from_file(file_url, document_name="Bond Document"):
     """
-    Extract bond fields from uploaded document using built-in text parsing.
+    Extract bond details from an uploaded file using pattern matching.
+    Returns bond field values to auto-fill the Add Bond form.
     No external API needed.
     """
     try:
-        import re
+        if not file_url:
+            return {"status": "error", "message": "No file URL provided"}
 
-        # Read file
-        extracted_text = ""
+        # Read the file
+        text = ""
         try:
-            file_path = frappe.get_site_path() + file_url
-            with open(file_path, 'rb') as f:
-                raw = f.read()
-            extracted_text = raw.decode('utf-8', errors='ignore')
+            site_path = frappe.get_site_path()
+            # Try multiple path patterns
+            for path in [site_path + file_url, site_path + "/public" + file_url, "." + file_url]:
+                try:
+                    with open(path, 'rb') as f:
+                        raw = f.read()
+                    text = raw.decode('utf-8', errors='ignore')
+                    if text.strip():
+                        break
+                except Exception:
+                    continue
         except Exception as fe:
-            return {"status": "error", "message": f"Cannot read file: {str(fe)}"}
+            return {"status": "error", "message": "Cannot read file: " + str(fe)}
 
-        if not extracted_text.strip():
-            return {"status": "error", "message": "File appears empty or is a scanned PDF (no text). Please use a text-based PDF or .txt file."}
+        if not text or len(text.strip()) < 50:
+            return {"status": "error", "message": "File is empty or unreadable. Please use a plain-text PDF or .txt file."}
 
-        text = extracted_text[:60000]
-
-        def find(patterns, default=None):
-            for p in patterns:
-                m = re.search(p, text, re.IGNORECASE)
+        # Extract bond fields using regex patterns
+        def find(patterns, txt=text):
+            for pat in patterns:
+                m = _re.search(pat, txt, _re.IGNORECASE)
                 if m:
                     return m.group(1).strip()
-            return default
-
-        def find_amount(patterns):
-            for p in patterns:
-                m = re.search(p, text, re.IGNORECASE)
-                if m:
-                    val = m.group(1).replace(",", "").replace(" ", "")
-                    try:
-                        return float(val)
-                    except Exception:
-                        pass
             return None
 
-        # Extract fields using regex patterns
+        def find_amount(patterns, txt=text):
+            for pat in patterns:
+                m = _re.search(pat, txt, _re.IGNORECASE)
+                if m:
+                    raw = m.group(1).replace(",","").strip()
+                    # Handle crores
+                    if _re.search(r'crore|cr\.?', txt[max(0,m.start()-20):m.end()+20], _re.I):
+                        try:
+                            return str(int(float(raw) * 10000000))
+                        except Exception:
+                            pass
+                    # Handle lakhs
+                    if _re.search(r'lakh|lac', txt[max(0,m.start()-20):m.end()+20], _re.I):
+                        try:
+                            return str(int(float(raw) * 100000))
+                        except Exception:
+                            pass
+                    return raw
+            return None
+
+        def find_date(patterns, txt=text):
+            for pat in patterns:
+                m = _re.search(pat, txt, _re.IGNORECASE)
+                if m:
+                    raw = m.group(1).strip()
+                    # Try to parse and normalize to YYYY-MM-DD
+                    for fmt in ["%d %B %Y", "%d-%m-%Y", "%d/%m/%Y", "%B %d, %Y", "%d %b %Y", "%Y-%m-%d"]:
+                        try:
+                            return datetime.datetime.strptime(raw, fmt).strftime("%Y-%m-%d")
+                        except Exception:
+                            pass
+                    return raw
+            return None
+
         fields = {}
 
-        # ISIN
-        isin = find([r'\bISIN[:\s]+([A-Z]{2}[A-Z0-9]{10})\b', r'\b(IN[A-Z0-9]{10})\b'])
-        if isin:
-            fields["isin"] = isin
+        # Bond/Issuer name
+        fields["bond_name"] = find([
+            r'(?:security description|bond name|name of (?:the )?(?:bond|security|instrument))[:\s]+([^\n]{5,80})',
+            r'(?:debentures?|bonds?|notes?)[:\s]+([A-Z][^\n]{5,60})',
+        ]) or document_name.replace(".pdf","").replace(".txt","").replace("_PROSP","").replace("_"," ").strip()
 
-        # Bond name
-        name = find([
-            r'(?:Information Memorandum|Prospectus|Offer Document)\s+(?:for|of|on)\s+(.+?)(?:\n|dated)',
-            r'(?:Issue of|Issuance of|Offering of)\s+(.+?)(?:\n|by\s)',
-            r'(?:Bond|Debenture|NCD|Note)s?\s+(?:of|by)\s+(.+?)(?:\n|Rs\.|INR|USD|\d)',
-        ])
-        if name:
-            fields["bond_name"] = name[:100]
+        # ISIN
+        fields["isin"] = find([r'\bISIN\b[:\s#]*([A-Z]{2}[A-Z0-9]{10})\b', r'\b(IN[A-Z0-9]{10})\b'])
 
         # Issuer
-        issuer = find([
-            r'(?:Issuer|Borrower|Company)[:\s]+([A-Z][A-Za-z\s&\.]+(?:Ltd|Limited|Inc|Corp|Bank|Finance|Capital)[\.A-Za-z]*)',
-            r'^([A-Z][A-Za-z\s&\.]+(?:Ltd|Limited|Bank|Finance|Capital)[\.A-Za-z]*)',
+        fields["issuer_name"] = find([
+            r'(?:issuer|company|borrower)[:\s]+([A-Z][A-Za-z\s\.]+(?:Limited|Ltd\.?|Corporation|Corp\.?|LLP|Inc\.?|Bank|Finance|Infra))',
+            r'^([A-Z][A-Za-z\s\.]+(?:Limited|Ltd\.?|Corporation|Bank|Finance))',
         ])
-        if issuer:
-            fields["issuer_name"] = issuer.strip()
 
         # Coupon rate
-        coupon = find([
-            r'(?:coupon rate|interest rate|rate of interest)[:\s]+(\d+\.?\d*)\s*%',
-            r'(\d+\.?\d*)\s*%\s*(?:per annum|p\.a\.|pa)',
-            r'at\s+(\d+\.?\d*)\s*%\s*(?:per|p\.)',
+        cr = find([
+            r'(?:coupon rate|interest rate|rate of interest)[:\s]+([\d\.]+)\s*%',
+            r'([\d\.]+)\s*%\s*(?:per annum|p\.?a\.?|fixed)',
         ])
-        if coupon:
+        if cr:
             try:
-                fields["coupon_rate"] = float(coupon)
+                fields["coupon_rate"] = str(round(float(cr), 4))
             except Exception:
-                pass
-
-        # Maturity
-        maturity = find([
-            r'(?:maturity date|redemption date|due date)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})',
-            r'(?:maturity date|redemption date)[:\s]+(\w+ \d{1,2},?\s*\d{4})',
-            r'(?:maturing on|redeemable on)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})',
-        ])
-        if maturity:
-            fields["maturity_date"] = maturity
-
-        # Issue date
-        issue_dt = find([
-            r'(?:issue date|dated)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})',
-            r'(?:date of issue|allotment date)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})',
-        ])
-        if issue_dt:
-            fields["issue_date"] = issue_dt
-
-        # Face value
-        fv = find_amount([
-            r'(?:face value|par value|denomination)[:\s]+(?:Rs\.?|INR|₹)\s*([\d,]+)',
-            r'(?:face value)[:\s]+([\d,]+)',
-        ])
-        if fv:
-            fields["face_value"] = fv
-
-        # Issue size
-        size = find_amount([
-            r'(?:total issue size|aggregate amount|issue size)[:\s]+(?:Rs\.?|INR|₹)?\s*([\d,]+(?:\.\d+)?)\s*(?:crore|cr|lakh|lac)?',
-        ])
-        if size:
-            # Handle crore/lakh
-            size_text = find([r'(?:total issue size|aggregate amount)[:\s]+(.{5,50})'])
-            if size_text and "crore" in size_text.lower():
-                size *= 10000000
-            elif size_text and "lakh" in size_text.lower():
-                size *= 100000
-            fields["total_issue_size"] = size
-
-        # Coupon frequency
-        freq_map = {
-            "monthly": "Monthly", "quarterly": "Quarterly",
-            "semi-annual": "Semi-Annual", "half-yearly": "Semi-Annual",
-            "half yearly": "Semi-Annual", "annual": "Annual", "yearly": "Annual",
-            "at maturity": "At Maturity", "zero": "At Maturity"
-        }
-        freq_text = find([r'(?:coupon|interest)\s+(?:payment\s+)?frequency[:\s]+(\w[\w\s\-]*)'])
-        if freq_text:
-            for k, v in freq_map.items():
-                if k in freq_text.lower():
-                    fields["coupon_frequency"] = v
-                    break
-
-        # Currency
-        if re.search(r'\bUSD\b|\bUS\$|\bdollar', text, re.I):
-            fields["issue_currency"] = "USD"
-        elif re.search(r'\bEUR\b|\beuro', text, re.I):
-            fields["issue_currency"] = "EUR"
-        elif re.search(r'\bGBP\b|\bsterling\b|\bpound\b', text, re.I):
-            fields["issue_currency"] = "GBP"
-        else:
-            fields["issue_currency"] = "INR"
+                fields["coupon_rate"] = cr
 
         # Coupon type
-        if re.search(r'zero.coupon|zero coupon|nil coupon', text, re.I):
-            fields["coupon_type"] = "Zero Coupon"
-        elif re.search(r'floating|variable|benchmark|mibor|sofr|euribor|libor', text, re.I):
-            fields["coupon_type"] = "Floating"
-        elif re.search(r'step.up|step up', text, re.I):
+        ct = text.lower()
+        if "step-up" in ct or "step up" in ct:
             fields["coupon_type"] = "Step-Up"
-        elif re.search(r'step.down|step down', text, re.I):
-            fields["coupon_type"] = "Step-Down"
-        elif re.search(r'fixed', text, re.I):
+        elif "floating" in ct or "variable" in ct:
+            fields["coupon_type"] = "Floating"
+        elif "zero coupon" in ct or "zero-coupon" in ct:
+            fields["coupon_type"] = "Zero Coupon"
+        else:
             fields["coupon_type"] = "Fixed"
 
+        # Coupon frequency
+        if "semi-annual" in ct or "semi annual" in ct or "half.yearly" in ct:
+            fields["coupon_frequency"] = "Semi-Annual"
+        elif "quarterly" in ct:
+            fields["coupon_frequency"] = "Quarterly"
+        elif "monthly" in ct:
+            fields["coupon_frequency"] = "Monthly"
+        elif "at maturity" in ct or "on maturity" in ct:
+            fields["coupon_frequency"] = "At Maturity"
+        else:
+            fields["coupon_frequency"] = "Annual"
+
         # Bond type
-        if re.search(r'government|g-sec|gsec|sovereign|treasury', text, re.I):
+        if "government" in ct or "g-sec" in ct or "gilt" in ct or "sovereign" in ct:
             fields["bond_type"] = "Government Bond"
-        elif re.search(r'convertible', text, re.I):
+        elif "convertible" in ct:
             fields["bond_type"] = "Convertible"
-        elif re.search(r'zero.coupon', text, re.I):
+        elif "zero coupon" in ct:
             fields["bond_type"] = "Zero Coupon"
         else:
             fields["bond_type"] = "Corporate Bond"
 
         # Security type
-        if re.search(r'unsecured', text, re.I):
-            fields["security_type"] = "Unsecured"
-        elif re.search(r'secured', text, re.I):
-            fields["security_type"] = "Secured"
+        fields["security_type"] = "Secured" if "secured" in ct and "unsecured" not in ct else "Unsecured"
 
-        # ESG
-        esg_map = [
-            ("green bond", "Green Bond"), ("blue bond", "Blue Bond"),
-            ("social bond", "Social Bond"), ("sustainability bond", "Sustainability Bond"),
-            ("climate bond", "Climate Bond"), ("gender", "Gender Equality Bond"),
-            ("transition bond", "Transition Bond"), ("pandemic", "Pandemic Bond"),
-        ]
-        for keyword, esg_type in esg_map:
-            if re.search(keyword, text, re.I):
-                fields["esg_classification"] = esg_type
-                break
-        if "esg_classification" not in fields:
-            fields["esg_classification"] = "None"
+        # Issue date
+        fields["issue_date"] = find_date([
+            r'(?:issue date|date of issue|allotment date)[:\s]+([\d]+(?:st|nd|rd|th)?\s+[A-Za-z]+\s+\d{4}|\d{1,2}[-/]\d{1,2}[-/]\d{4})',
+            r'(?:issue date|date of issue)[:\s]+(\d{4}-\d{2}-\d{2})',
+        ])
+
+        # Maturity date
+        fields["maturity_date"] = find_date([
+            r'(?:maturity date|redemption date|date of redemption|due date)[:\s]+([\d]+(?:st|nd|rd|th)?\s+[A-Za-z]+\s+\d{4}|\d{1,2}[-/]\d{1,2}[-/]\d{4})',
+        ])
+
+        # First coupon date
+        fields["first_coupon_date"] = find_date([
+            r'(?:first coupon date|first interest payment)[:\s]+([\d]+(?:st|nd|rd|th)?\s+[A-Za-z]+\s+\d{4}|\d{1,2}[-/]\d{1,2}[-/]\d{4})',
+        ])
+
+        # Tenor
+        tenor = find([r'(?:tenor|period|term)[:\s]+([\d]+)\s*(?:years?|yrs?)', r'([\d]+)\s*years?\s*(?:from|bonds?)'])
+        if tenor:
+            fields["tenor_years"] = tenor
+        elif fields.get("issue_date") and fields.get("maturity_date"):
+            try:
+                d1 = datetime.date.fromisoformat(fields["issue_date"])
+                d2 = datetime.date.fromisoformat(fields["maturity_date"])
+                fields["tenor_years"] = str(round((d2-d1).days/365.25, 1))
+            except Exception:
+                pass
+
+        # Face value
+        fv = find_amount([
+            r'(?:face value|nominal value|par value)[:\s]+(?:Rs\.?|INR|₹)?\s*([\d,]+(?:\.\d+)?)',
+            r'(?:face value|par value)[:\s]+([\d,]+)',
+        ])
+        if fv:
+            fields["face_value"] = fv
+
+        # Issue size
+        sz = find_amount([
+            r'(?:issue size|total issue|aggregate amount|issue amount)[:\s]+(?:Rs\.?|INR|₹)?\s*([\d,\.]+)',
+            r'(?:aggregate principal amount)[:\s]+(?:Rs\.?|INR|₹)?\s*([\d,\.]+)',
+        ])
+        if sz:
+            fields["total_issue_size"] = sz
+
+        # Principal amount
+        pa = find_amount([
+            r'(?:principal amount|base amount)[:\s]+(?:Rs\.?|INR|₹)?\s*([\d,\.]+)',
+        ])
+        if pa:
+            fields["principal_amount"] = pa
+
+        # Currency
+        if "usd" in ct or "u.s. dollar" in ct or "dollar" in ct:
+            fields["issue_currency"] = "USD"
+        elif "eur" in ct or "euro" in ct:
+            fields["issue_currency"] = "EUR"
+        elif "gbp" in ct or "sterling" in ct:
+            fields["issue_currency"] = "GBP"
+        else:
+            fields["issue_currency"] = "INR"
 
         # Credit rating
-        rating = find([
-            r'(?:rated|rating)[:\s]+([A-Za-z]+[+\-]?(?:/[A-Za-z]+[+\-]?)?)',
-            r'\b(AAA|AA\+|AA|AA\-|A\+|A\b|A\-|BBB\+|BBB|BB\+|BB|B\+|B\b)\b',
-        ])
-        if rating:
-            fields["credit_rating"] = rating
+        rating_match = _re.search(
+            r'\b(AAA|AA\+?-?|A\+?-?|BBB\+?-?|BB\+?-?|B\+?-?|C(?:CC)?|D)\b(?:\s*\(SO\)|\s*\(CE\))?',
+            text
+        )
+        if rating_match:
+            fields["credit_rating"] = rating_match.group(0).strip()
 
         # Rating agency
-        for agency in ["CRISIL", "ICRA", "CARE", "India Ratings", "S&P", "Moody's", "Fitch"]:
-            if agency.lower() in text.lower():
-                fields["credit_rating_agency"] = agency
-                break
+        if "crisil" in ct:
+            fields["credit_rating_agency"] = "CRISIL"
+        elif "icra" in ct:
+            fields["credit_rating_agency"] = "ICRA"
+        elif "care" in ct:
+            fields["credit_rating_agency"] = "CARE"
+        elif "india ratings" in ct or "ind-ra" in ct:
+            fields["credit_rating_agency"] = "India Ratings"
+        elif "moody" in ct:
+            fields["credit_rating_agency"] = "Moody's"
+        elif "s&p" in ct or "standard & poor" in ct:
+            fields["credit_rating_agency"] = "S&P"
+        elif "fitch" in ct:
+            fields["credit_rating_agency"] = "Fitch"
+
+        # Rating outlook
+        if "stable" in ct:
+            fields["rating_outlook"] = "Stable"
+        elif "positive" in ct:
+            fields["rating_outlook"] = "Positive"
+        elif "negative" in ct:
+            fields["rating_outlook"] = "Negative"
+        elif "watch" in ct:
+            fields["rating_outlook"] = "Watch"
+
+        # ESG
+        if "green bond" in ct:
+            fields["esg_classification"] = "Green Bond"
+        elif "blue bond" in ct:
+            fields["esg_classification"] = "Blue Bond"
+        elif "social bond" in ct:
+            fields["esg_classification"] = "Social Bond"
+        elif "sustainability bond" in ct:
+            fields["esg_classification"] = "Sustainability Bond"
+        elif "climate bond" in ct:
+            fields["esg_classification"] = "Climate Bond"
+        else:
+            fields["esg_classification"] = "None"
 
         # Day count
-        if re.search(r'actual/actual|act/act', text, re.I):
+        if "actual/actual" in ct or "act/act" in ct:
             fields["day_count_convention"] = "Actual/Actual"
-        elif re.search(r'actual/360|act/360', text, re.I):
+        elif "actual/360" in ct or "act/360" in ct:
             fields["day_count_convention"] = "Actual/360"
-        elif re.search(r'30/360', text, re.I):
+        elif "30/360" in ct:
             fields["day_count_convention"] = "30/360"
         else:
             fields["day_count_convention"] = "Actual/365"
 
-        # Callable
-        fields["is_callable"] = 1 if re.search(r'call option|callable|call date|call price', text, re.I) else 0
-        fields["is_puttable"] = 1 if re.search(r'put option|puttable|put date|put price', text, re.I) else 0
-        fields["is_convertible"] = 1 if re.search(r'convertible|conversion ratio|conversion price', text, re.I) else 0
-        fields["is_amortizing"] = 1 if re.search(r'amortiz|partial redemption|scheduled repayment', text, re.I) else 0
+        # Exchange listing
+        if "nse" in ct and "bse" in ct:
+            fields["exchange_listing"] = "NSE+BSE"
+        elif "nse" in ct:
+            fields["exchange_listing"] = "NSE"
+        elif "bse" in ct:
+            fields["exchange_listing"] = "BSE"
 
         # Governing law
-        if re.search(r'english law|uk law|laws of england', text, re.I):
+        if "indian law" in ct or "laws of india" in ct:
+            fields["governing_law"] = "Indian Law"
+        elif "english law" in ct or "uk law" in ct:
             fields["governing_law"] = "UK English Law"
-        elif re.search(r'new york law|laws of new york|state of new york', text, re.I):
+        elif "new york" in ct:
             fields["governing_law"] = "New York Law"
         else:
             fields["governing_law"] = "Indian Law"
 
-        # Exchange
-        if re.search(r'\bNSE\b.*\bBSE\b|\bBSE\b.*\bNSE\b', text):
-            fields["exchange_listing"] = "NSE+BSE"
-        elif re.search(r'\bNSE\b', text):
-            fields["exchange_listing"] = "NSE"
-        elif re.search(r'\bBSE\b', text):
-            fields["exchange_listing"] = "BSE"
-        elif re.search(r'luxembourg|dublin|singapore', text, re.I):
-            fields["exchange_listing"] = find([r'(Luxembourg|Dublin|Singapore)'], "OTC")
-        else:
-            fields["exchange_listing"] = "OTC"
-
         # Use of proceeds
         uop = find([
-            r'(?:use of proceeds|utilisation of proceeds|utilization of proceeds)[:\s]+([^.]+\.)',
-            r'(?:proceeds.*?shall be used|funds.*?raised.*?will be used)\s+(?:for|towards)\s+(.+?)(?:\.|$)',
+            r'(?:use of proceeds|utilization of proceeds|object(?:ive)?s? of the issue)[:\s\n]+([^\n]{20,500})',
         ])
         if uop:
             fields["use_of_proceeds"] = uop[:500]
 
-        # Remarks
-        fields["remarks"] = f"Auto-extracted from: {document_name}"
+        # SEBI registration
+        fields["sebi_registration"] = find([
+            r'(?:SEBI registration|SEBI reg(?:istration)? (?:no|number))[.:\s#]+([A-Z0-9/\-]+)',
+        ])
+
+        # Is callable
+        fields["is_callable"] = 1 if "call option" in ct or "callable" in ct else 0
+        fields["is_puttable"] = 1 if "put option" in ct or "puttable" in ct else 0
+        fields["is_convertible"] = 1 if "convertible" in ct and "non-convertible" not in ct else 0
+        fields["is_amortizing"] = 1 if "amortizing" in ct or "amortization" in ct else 0
+
+        # Remove None values
+        fields = {k: v for k, v in fields.items() if v is not None and v != ""}
 
         return {
             "status": "success",
             "bond_fields": fields,
-            "message": f"Extracted {len(fields)} fields from {document_name}",
-            "extracted_chars": len(text)
+            "message": "Extracted " + str(len(fields)) + " fields from " + document_name,
+            "text_preview": text[:200]
         }
 
     except Exception as e:
-        frappe.log_error(str(e), "bizaxl_bond_extract")
+        frappe.log_error(str(e), "extract_bond_from_file")
+        return {"status": "error", "message": str(e)}
+
+
+@frappe.whitelist(allow_guest=True)
+def process_bond_document(bond_doc_name):
+    """Process an uploaded bond document — extract text and mark as Ready."""
+    try:
+        doc = frappe.get_doc("Bond Document", bond_doc_name)
+        file_url = doc.file_attachment or ""
+        extracted_text = ""
+        if file_url:
+            site_path = frappe.get_site_path()
+            for path in [site_path + file_url, site_path + "/public" + file_url]:
+                try:
+                    with open(path, 'rb') as f:
+                        raw = f.read()
+                    extracted_text = raw.decode('utf-8', errors='ignore')
+                    if extracted_text.strip():
+                        break
+                except Exception:
+                    continue
+
+        summary = extracted_text[:500] if extracted_text else "Document uploaded — text extraction available."
+
+        doc.processing_status = "Ready"
+        doc.extracted_text = extracted_text[:100000] if extracted_text else ""
+        doc.document_summary = summary
+        doc.save(ignore_permissions=True)
+        frappe.db.commit()
+
+        return {
+            "status": "success",
+            "message": "Document processed. " + str(len(extracted_text)) + " characters extracted.",
+            "chars_extracted": len(extracted_text)
+        }
+    except Exception as e:
+        frappe.log_error(str(e), "process_bond_document")
         return {"status": "error", "message": str(e)}
