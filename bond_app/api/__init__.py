@@ -1647,3 +1647,40 @@ def process_bond_document(bond_doc_name):
     except Exception as e:
         frappe.log_error(str(e), "process_bond_document")
         return {"status": "error", "message": str(e)}
+
+
+# ─── GET BOND DOCUMENTS (was missing — caused 417 error) ──────────────────────
+@frappe.whitelist(allow_guest=True)
+def get_bond_documents(bond_name):
+    """Get all uploaded documents for a bond."""
+    try:
+        docs = frappe.get_all(
+            "Bond Document",
+            filters={"bond_name": bond_name},
+            fields=["name", "document_name", "document_type", "document_date",
+                    "processing_status", "file_attachment"],
+            order_by="modified desc"
+        )
+        return docs or []
+    except Exception as e:
+        frappe.log_error(str(e), "get_bond_documents")
+        return []
+
+
+@frappe.whitelist(allow_guest=True)
+def get_ai_chat_history(bond_name, session_id=None):
+    """Get AI chat history for a bond."""
+    try:
+        filters = {"bond_name": bond_name}
+        if session_id:
+            filters["session_id"] = session_id
+        chats = frappe.get_all(
+            "Bond AI Chat",
+            filters=filters,
+            fields=["question", "answer", "asked_on", "session_id"],
+            order_by="asked_on asc",
+            limit=50
+        )
+        return chats or []
+    except Exception as e:
+        return []
