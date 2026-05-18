@@ -2027,3 +2027,134 @@ def extract_bond_from_file(file_url, document_name="Bond Document"):
     except Exception as e:
         frappe.log_error(str(e), "extract_bond_from_file")
         return {"status": "error", "message": str(e)}
+
+
+# ─── SAVE BOND (reliable backend save) ───────────────────────────────────────
+@frappe.whitelist(allow_guest=True)
+def save_bond(bond_data):
+    """Save a new bond to Bond Master. Returns the saved doc name."""
+    try:
+        if isinstance(bond_data, str):
+            import json
+            bond_data = json.loads(bond_data)
+
+        bond_name = bond_data.get("bond_name", "").strip()
+        if not bond_name:
+            return {"status": "error", "message": "Bond name is required"}
+
+        # Check if already exists
+        existing = frappe.db.exists("Bond Master", {"bond_name": bond_name})
+        if existing:
+            return {"status": "error", "message": "Bond '" + bond_name + "' already exists"}
+
+        # Build the doc - safely handle all fields
+        doc = frappe.get_doc({
+            "doctype": "Bond Master",
+            "bond_name": bond_name,
+        })
+
+        # Map all fields safely
+        field_map = {
+            "isin": "isin",
+            "issuer_name": "issuer_name",
+            "issuer_type": "issuer_type",
+            "bond_type": "bond_type",
+            "issue_date": "issue_date",
+            "maturity_date": "maturity_date",
+            "first_coupon_date": "first_coupon_date",
+            "tenor_years": "tenor_years",
+            "principal_amount": "principal_amount",
+            "face_value": "face_value",
+            "total_issue_size": "total_issue_size",
+            "issue_currency": "issue_currency",
+            "coupon_type": "coupon_type",
+            "coupon_rate": "coupon_rate",
+            "coupon_frequency": "coupon_frequency",
+            "credit_rating": "credit_rating",
+            "credit_rating_agency": "credit_rating_agency",
+            "rating_outlook": "rating_outlook",
+            "esg_classification": "esg_classification",
+            "day_count_convention": "day_count_convention",
+            "governing_law": "governing_law",
+            "exchange_listing": "exchange_listing",
+            "security_type": "security_type",
+            "use_of_proceeds": "use_of_proceeds",
+            "sebi_registration": "sebi_registration",
+            "is_callable": "is_callable",
+            "call_date": "call_date",
+            "call_price": "call_price",
+            "is_puttable": "is_puttable",
+            "put_date": "put_date",
+            "put_price": "put_price",
+            "is_convertible": "is_convertible",
+            "is_amortizing": "is_amortizing",
+            "remarks": "remarks",
+        }
+
+        numeric_fields = {"tenor_years", "principal_amount", "face_value",
+                          "total_issue_size", "coupon_rate", "call_price",
+                          "put_price", "outstanding_amount"}
+
+        for key, field in field_map.items():
+            val = bond_data.get(key)
+            if val is not None and val != "" and val != "null":
+                if field in numeric_fields:
+                    try:
+                        setattr(doc, field, float(val))
+                    except (ValueError, TypeError):
+                        pass
+                else:
+                    setattr(doc, field, val)
+
+        # Set defaults
+        if not doc.is_active:
+            doc.is_active = 1
+        if not doc.esg_classification:
+            doc.esg_classification = "None"
+        if not doc.issue_currency:
+            doc.issue_currency = "INR"
+
+        doc.insert(ignore_permissions=True)
+        frappe.db.commit()
+
+        return {
+            "status": "success",
+            "name": doc.name,
+            "bond_name": doc.bond_name,
+            "message": "Bond saved successfully"
+        }
+
+    except Exception as e:
+        frappe.log_error(str(e), "save_bond")
+        return {"status": "error", "message": str(e)}
+
+
+@frappe.whitelist(allow_guest=True)
+def save_client(client_data):
+    """Save a new client to Bond Client."""
+    try:
+        if isinstance(client_data, str):
+            import json
+            client_data = json.loads(client_data)
+
+        full_name = client_data.get("full_name", "").strip()
+        if not full_name:
+            return {"status": "error", "message": "Full name is required"}
+
+        doc = frappe.get_doc({"doctype": "Bond Client", "full_name": full_name})
+
+        for field in ["email", "phone", "client_type", "kyc_status",
+                      "demat_account_number", "dp_name", "risk_profile",
+                      "relationship_manager", "pan_number"]:
+            val = client_data.get(field)
+            if val is not None and val != "":
+                setattr(doc, field, val)
+
+        doc.is_active = 1
+        doc.insert(ignore_permissions=True)
+        frappe.db.commit()
+
+        return {"status": "success", "name": doc.name, "message": "Client saved"}
+    except Exception as e:
+        frappe.log_error(str(e), "save_client")
+        return {"status": "error", "message": str(e)}

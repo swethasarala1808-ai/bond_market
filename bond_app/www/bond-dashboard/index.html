@@ -638,13 +638,53 @@ async function autoFillBond(input){
 }
 
 async function saveBond(){
-  var name=document.getElementById('ab-name').value;if(!name){toast('Bond name required','err');return;}
+  var name=document.getElementById('ab-name').value.trim();
+  if(!name){toast('Bond name is required','err');return;}
+
+  var saveBtn=document.querySelector('#m-add-bond .btn-grad');
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='Saving...';}
+
   try{
-    var vals={doctype:'Bond Master',bond_name:name,isin:document.getElementById('ab-isin').value,issuer_name:document.getElementById('ab-issuer').value,bond_type:document.getElementById('ab-btype').value,issue_date:document.getElementById('ab-idate').value,maturity_date:document.getElementById('ab-mdate').value,principal_amount:document.getElementById('ab-prin').value,face_value:document.getElementById('ab-fv').value,issue_currency:document.getElementById('ab-curr').value,coupon_type:document.getElementById('ab-ctype').value,coupon_rate:document.getElementById('ab-crate').value,coupon_frequency:document.getElementById('ab-cfreq').value,credit_rating:document.getElementById('ab-rating').value,credit_rating_agency:document.getElementById('ab-ragency').value,esg_classification:document.getElementById('ab-esg').value,day_count_convention:document.getElementById('ab-dcc').value,use_of_proceeds:document.getElementById('ab-uop').value,is_active:1};
-    var fd=new URLSearchParams();fd.append('doc',JSON.stringify(vals));fd.append('action','Save');
-    await fetch('/api/method/frappe.desk.form.save.savedocs',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Frappe-CSRF-Token':gc()},body:fd});
-    closeM('m-add-bond');toast('Bond saved!','ok');loadBonds();loadDashboard();
-  }catch(e){toast('Error saving bond','err');}
+    function gv(id){var el=document.getElementById(id);return el?el.value.trim():'';}
+    function gs(id){var el=document.getElementById(id);return el?el.value:'';}
+
+    var bondData={
+      bond_name:name,
+      isin:gv('ab-isin'),
+      issuer_name:gv('ab-issuer'),
+      bond_type:gs('ab-btype'),
+      issue_date:gv('ab-idate'),
+      maturity_date:gv('ab-mdate'),
+      principal_amount:gv('ab-prin'),
+      face_value:gv('ab-fv'),
+      issue_currency:gs('ab-curr')||'INR',
+      coupon_type:gs('ab-ctype')||'Fixed',
+      coupon_rate:gv('ab-crate'),
+      coupon_frequency:gs('ab-cfreq')||'Annual',
+      credit_rating:gv('ab-rating'),
+      credit_rating_agency:gs('ab-ragency'),
+      esg_classification:gs('ab-esg')||'None',
+      day_count_convention:gs('ab-dcc')||'Actual/Actual',
+      use_of_proceeds:gv('ab-uop')
+    };
+
+    // Use our dedicated backend save_bond API
+    var r=await post('bond_app.api.save_bond',{bond_data:JSON.stringify(bondData)});
+
+    if(r&&r.status==='success'){
+      closeM('m-add-bond');
+      toast('Bond "'+name+'" saved!','ok');
+      clearBondForm();
+      setTimeout(function(){loadBonds();loadDashboard();},400);
+    } else {
+      var msg=(r&&r.message)||'Save failed';
+      toast(msg,'err');
+      if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='Save Bond';}
+    }
+  }catch(e){
+    toast('Error: '+e.message,'err');
+    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='Save Bond';}
+  }
 }
 
 // ── COUPONS ─────────────────────────────────────────────────────────────────
@@ -666,7 +706,30 @@ async function loadClients(){
 }
 async function viewClient(enc){var name=decodeURIComponent(enc);var h=await post('bond_app.api.get_client_holdings',{client_name:name})||[];document.getElementById('m-cl-t').textContent='Holdings — '+name;document.getElementById('m-cl-b').innerHTML=h.length?'<div style="overflow-x:auto"><table><thead><tr><th>Bond</th><th>ISIN</th><th>Qty</th><th>Purchase</th><th>Current Value</th><th>P&L</th><th>Maturity</th></tr></thead><tbody>'+h.map(function(x){return '<tr><td style="font-weight:600">'+(x.bond_name||'—')+'</td><td style="font-family:monospace;font-size:.69rem">'+(x.isin||'—')+'</td><td>'+(x.quantity||0)+'</td><td>'+fmt(x.purchase_amount)+'</td><td>'+fmt(x.current_value)+'</td><td style="color:'+(x.unrealized_pnl>=0?'#16a34a':'#dc2626')+'">'+fmt(x.unrealized_pnl)+'</td><td>'+fmtD(x.maturity_date)+'</td></tr>';}).join('')+'</tbody></table></div>':'<div class="empty">No holdings found</div>';openM('m-client');}
 function openAddClient(){openM('m-add-client');}
-async function saveClient(){var name=document.getElementById('ac-name').value;if(!name){toast('Name required','err');return;}try{var vals={doctype:'Bond Client',full_name:name,email:document.getElementById('ac-email').value,phone:document.getElementById('ac-phone').value,client_type:document.getElementById('ac-type').value,kyc_status:document.getElementById('ac-kyc').value,demat_account_number:document.getElementById('ac-demat').value,dp_name:document.getElementById('ac-dp').value,risk_profile:document.getElementById('ac-risk').value,relationship_manager:document.getElementById('ac-rm').value,is_active:1};var fd=new URLSearchParams();fd.append('doc',JSON.stringify(vals));fd.append('action','Save');await fetch('/api/method/frappe.desk.form.save.savedocs',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Frappe-CSRF-Token':gc()},body:fd});closeM('m-add-client');toast('Client saved!','ok');loadClients();}catch(e){toast('Error','err');}}
+async function saveClient(){
+  var name=document.getElementById('ac-name').value.trim();
+  if(!name){toast('Name required','err');return;}
+  try{
+    var cd={
+      full_name:name,
+      email:document.getElementById('ac-email').value||'',
+      phone:document.getElementById('ac-phone').value||'',
+      client_type:document.getElementById('ac-type').value||'Individual',
+      kyc_status:document.getElementById('ac-kyc').value||'Pending',
+      demat_account_number:document.getElementById('ac-demat').value||'',
+      dp_name:document.getElementById('ac-dp').value||'',
+      risk_profile:document.getElementById('ac-risk').value||'Moderate',
+      relationship_manager:document.getElementById('ac-rm').value||''
+    };
+    var r=await post('bond_app.api.save_client',{client_data:JSON.stringify(cd)});
+    if(r&&r.status==='success'){
+      closeM('m-add-client');toast('Client "'+name+'" saved!','ok');
+      setTimeout(function(){loadClients();},400);
+    } else {
+      toast((r&&r.message)||'Save failed','err');
+    }
+  }catch(e){toast('Error: '+e.message,'err');}
+}
 
 // ── PORTFOLIO ───────────────────────────────────────────────────────────────
 async function loadPortfolioClients(){var c=await post('bond_app.api.get_clients',{})||[];var sel=document.getElementById('pf-client');sel.innerHTML='<option value="">Select Client</option>';for(var i=0;i<c.length;i++)sel.innerHTML+='<option value="'+encodeURIComponent(c[i].full_name)+'">'+c[i].full_name+'</option>';}
@@ -722,9 +785,9 @@ async function uploadDoc(input){
     var ud=await ur.json();var fileUrl=(ud.message&&ud.message.file_url)||'';
     if(!fileUrl){document.getElementById('up-status').textContent='❌ Upload failed';input.value='';return;}
     var vals={doctype:'Bond Document',bond_name:aiSel,document_name:docName,document_type:docType,document_date:new Date().toISOString().split('T')[0],file_attachment:fileUrl,processing_status:'Uploaded'};
-    var fd2=new URLSearchParams();fd2.append('doc',JSON.stringify(vals));fd2.append('action','Save');
-    var sr=await fetch('/api/method/frappe.desk.form.save.savedocs',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Frappe-CSRF-Token':gc()},body:fd2});
-    var sd=await sr.json();lastDoc=(sd.docs&&sd.docs[0]&&sd.docs[0].name)||'';
+    var fd2=new URLSearchParams();fd2.append('doc',JSON.stringify(vals));
+    var sr=await fetch('/api/method/frappe.client.insert',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Frappe-CSRF-Token':gc()},body:fd2});
+    var sd=await sr.json();lastDoc=(sd.message&&sd.message.name)||'';
     document.getElementById('up-status').textContent='✅ Uploaded! Click Process to extract.';
     document.getElementById('proc-btn').disabled=false;
     await loadBondDocs();
